@@ -1,0 +1,87 @@
+# Gemelo Digital València
+
+Gemelo digital 3D de la ciudad de València que funciona en el navegador. Integra fuentes
+heterogéneas (datos abiertos municipales, meteorología, sensores IoT, metro y puerto) en un
+**bus común**, las cruza con un **motor de reglas** por distrito y muestra el resultado sobre
+la ciudad en 3D.
+
+## Qué hace
+
+- **7 fuentes, 5 protocolos** en un bus común (`src/core/bus.ts`):
+
+  | Fuente | Protocolo | Origen |
+  |---|---|---|
+  | Tráfico en tiempo real | REST (Opendatasoft) | **Real**: Ajuntament de València |
+  | Valenbisi | REST | **Real**: Ajuntament de València |
+  | Calidad del aire | REST | **Real**: red de vigilancia atmosférica |
+  | Meteorología | REST | **Real**: Open-Meteo |
+  | Sensores IoT (ruido, incidencias) | MQTT | Simulado |
+  | Metrovalencia | GTFS-Realtime | Simulado |
+  | Port de València (PLCs) | OPC UA | Simulado |
+
+  Si una API pública no responde, su simulador equivalente toma el relevo publicando
+  entidades **FIWARE NGSI-LD** (Smart Data Models `TrafficFlowObserved`, `AirQualityObserved`,
+  `BikeHireDockingStation`), el estándar de la plataforma VLCi del Ajuntament. Cuando la API
+  vuelve, se recupera el dato real automáticamente.
+
+- **Motor de reglas** (`src/core/rules.ts`) que cruza fuentes por distrito:
+  - **R1** Incidente + atasco (+ lluvia → crítica) → ruta recomendada en metro desde la estación
+    más cercana con servicio.
+  - **R2** NO₂/PM10 altos + congestión → episodio de contaminación por tráfico.
+  - **R3** Lluvia fuerte en distritos inundables (Poblats Marítims, Camins al Grau, Quatre
+    Carreres); crítica si además hay metro interrumpido (riesgo DANA).
+  - **R4** Cola de camiones en el puerto + congestión en los distritos marítimos.
+  - **R5** Valenbisi vacío justo donde hay atasco → reequilibrado.
+  - **R6** Retrasos en metro + congestión generalizada → movilidad degradada.
+
+- **La ciudad en 3D**: edificios de OpenStreetMap con su altura real (vía OpenFreeMap, sin
+  clave), puntos de interés (Ciutat de les Arts i les Ciències, Micalet, Mercat Central…).
+- **Escenarios** inyectables (accidente con lluvia, episodio de NO₂, colapso del puerto,
+  avería de metro) para hacer una demo del motor de reglas.
+- **Pensado para móviles**: simulación en un Web Worker, perfil de rendimiento automático según
+  la GPU/CPU (pixel ratio, antialiasing, zoom mínimo de edificios = LOD), panel como hoja inferior.
+
+## Arquitectura
+
+```
+APIs públicas (REST) ──┐                              ┌─> CityStore ─> Motor de reglas ─> Alertas
+Web Worker (simulación)│  decodificadores por        │                                   │
+  MQTT / GTFS-RT /     ├─ protocolo ─> EventBus ─────┤                                   v
+  OPC UA / NGSI-LD ────┘  (src/adapters)             └─> React + MapLibre (mapa 3D, paneles)
+```
+
+Los simuladores (`src/sim/simulator.ts`) emiten exactamente el formato de cada protocolo
+(`src/sim/protocols.ts`), y los decodificadores (`src/adapters/decoders.ts`) son los mismos que
+usaría un driver real: para conectar un broker MQTT, un feed GTFS-RT o un Context Broker
+FIWARE solo hay que cambiar el transporte.
+
+## Uso
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # tests del motor de reglas, parsers y simulador
+npm run build    # genera dist/ (estático)
+```
+
+## Despliegue
+
+`dist/` es un sitio estático. El workflow `.github/workflows/deploy.yml` lo publica en
+**GitHub Pages** al hacer push a `main` (activar en *Settings → Pages → Source: GitHub Actions*).
+También funciona tal cual en Cloudflare Pages, Netlify o Vercel (comando `npm run build`,
+directorio `dist`).
+
+## Transparencia
+
+- Datos reales: tráfico, Valenbisi, calidad del aire (portal de datos abiertos del Ajuntament
+  de València) y meteorología (Open-Meteo). Cartografía © OpenStreetMap.
+- Simulados: sensores IoT, Metrovalencia y PLCs del puerto, con el formato real de cada protocolo.
+- Las coordenadas de distritos, estaciones de metro y elementos del puerto son aproximadas.
+
+## Hoja de ruta
+
+- Ortofoto y modelo de elevación del ICV (Institut Cartogràfic Valencià).
+- Modelos BIM/IFC (p. ej. edificios municipales o del puerto) con `web-ifc`.
+- Análisis histórico de accidentes frente a la lluvia con los datos abiertos de accidentalidad.
+- Backend ligero (Cloudflare Workers/D1) para histórico y conexión a un Context Broker FIWARE real.
+- Límites oficiales de distritos y barrios (GeoJSON del portal de datos abiertos).
