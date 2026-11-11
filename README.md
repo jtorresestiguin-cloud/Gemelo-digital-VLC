@@ -7,7 +7,7 @@ la ciudad en 3D.
 
 ## Qué hace
 
-- **7 fuentes, 5 protocolos** en un bus común (`src/core/bus.ts`):
+- **7 fuentes en tiempo real, 5 protocolos** en un bus común (`src/core/bus.ts`):
 
   | Fuente | Protocolo | Origen |
   |---|---|---|
@@ -35,7 +35,22 @@ la ciudad en 3D.
   - **R6** Retrasos en metro + congestión generalizada → movilidad degradada.
 
 - **La ciudad en 3D**: edificios de OpenStreetMap con su altura real (vía OpenFreeMap, sin
-  clave), puntos de interés (Ciutat de les Arts i les Ciències, Micalet, Mercat Central…).
+  clave), puntos de interés (Ciutat de les Arts i les Ciències, Micalet, Mercat Central…),
+  **ortofoto PNOA** del IGN y **relieve 3D** (Terrain Tiles de AWS Open Data) activables.
+- **Los 19 distritos** con sus límites oficiales (portal de datos abiertos) coloreados según la
+  peor alerta activa. Los elementos se asignan a su distrito por punto-en-polígono; si el
+  servicio no responde, se usan polígonos aproximados (Voronoi de los centroides).
+- **Modelos BIM (IFC)** abiertos en el navegador con **web-ifc** (WebAssembly) y dibujados con
+  three.js dentro del mapa, con orientación y posición ajustables. Incluye un modelo de ejemplo
+  (`public/bim/ejemplo-terminal.ifc`, generado con `scripts/make-sample-ifc.mjs`). three.js y
+  web-ifc solo se descargan al abrir un modelo.
+- **Análisis de accidentes frente a la lluvia**: sube un CSV de accidentes (fecha y hora); la
+  lluvia horaria se descarga de Open-Meteo (reanálisis ERA5) y se calcula la **razón de tasas
+  ajustada por Mantel-Haenszel** (estratos: hora del día × laborable/fin de semana) con IC 95 %
+  (Greenland–Robins), más la tasa por hora del día en seco y con lluvia. Incluye una demo con
+  datos sintéticos de efecto conocido para validar el método.
+- **Histórico de indicadores** (últimas 24 h, guardado en el navegador): congestión, NO₂,
+  alertas y cola del puerto.
 - **Escenarios** inyectables (accidente con lluvia, episodio de NO₂, colapso del puerto,
   avería de metro) para hacer una demo del motor de reglas.
 - **Pensado para móviles**: simulación en un Web Worker, perfil de rendimiento automático según
@@ -76,12 +91,14 @@ directorio `dist`).
 - Datos reales: tráfico, Valenbisi, calidad del aire (portal de datos abiertos del Ajuntament
   de València) y meteorología (Open-Meteo). Cartografía © OpenStreetMap.
 - Simulados: sensores IoT, Metrovalencia y PLCs del puerto, con el formato real de cada protocolo.
-- Las coordenadas de distritos, estaciones de metro y elementos del puerto son aproximadas.
+- Las coordenadas de estaciones de metro y elementos del puerto, y los centroides de distrito,
+  son aproximados. El modelo BIM de ejemplo es genérico, no un edificio real del puerto.
+- Ortofoto: PNOA © Instituto Geográfico Nacional. Relieve: Mapzen Terrain Tiles.
 
 ## Hoja de ruta
 
-- Ortofoto y modelo de elevación del ICV (Institut Cartogràfic Valencià).
-- Modelos BIM/IFC (p. ej. edificios municipales o del puerto) con `web-ifc`.
-- Análisis histórico de accidentes frente a la lluvia con los datos abiertos de accidentalidad.
-- Backend ligero (Cloudflare Workers/D1) para histórico y conexión a un Context Broker FIWARE real.
-- Límites oficiales de distritos y barrios (GeoJSON del portal de datos abiertos).
+- Backend ligero (Cloudflare Workers/D1) para histórico compartido y conexión a un Context
+  Broker FIWARE real (requiere una cuenta de Cloudflare).
+- Ortofoto propia del ICV (Institut Cartogràfic Valencià) como alternativa al PNOA.
+- Carga automática del conjunto de accidentalidad del Ajuntament en el análisis.
+- Barrios (además de distritos) en el motor de reglas.

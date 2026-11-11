@@ -4,11 +4,16 @@ import { detectPerformance } from './core/device';
 import type { LngLat } from './core/types';
 import { CityMap, type LayerKey } from './map/CityMap';
 import { AlertsPanel, KpiBar, LayersPanel, ScenariosPanel, SourcesPanel } from './ui/Panels';
+import { AnalysisPanel } from './ui/AnalysisPanel';
+import { BimPanel, type BimModel } from './ui/BimPanel';
+import type { Map as MlMap } from 'maplibre-gl';
+import { PORT_ASSETS } from './data/static';
 
 const runtime = new CityRuntime();
-type Tab = 'alerts' | 'sources' | 'layers' | 'scenarios';
+type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 
 const ALL_LAYERS: Record<LayerKey, boolean> = {
+  districts: true, ortho: false, terrain: false, bim: true,
   buildings: true, traffic: true, bikes: true, air: true, noise: false, metro: true, port: true, incidents: true, alerts: true, landmarks: true,
 };
 
@@ -17,9 +22,17 @@ export default function App() {
   const snapshot = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
   const [tab, setTab] = useState<Tab>('alerts');
   const [layers, setLayers] = useState(ALL_LAYERS);
-  const [focus, setFocus] = useState<{ lngLat: LngLat; seq: number }>();
+  const [focus, setFocus] = useState<{ lngLat: LngLat; seq: number; zoom?: number }>();
   const [baseMapOnline, setBaseMapOnline] = useState<boolean>();
   const [collapsed, setCollapsed] = useState(false);
+  const [map, setMap] = useState<MlMap>();
+  const [bimModel, setBimModel] = useState<BimModel>();
+  const [bimAnchor, setBimAnchor] = useState<LngLat>(PORT_ASSETS[0].lngLat);
+  const [bimRotation, setBimRotation] = useState(32);
+  const bim = useMemo(
+    () => (bimModel ? { geometry: bimModel.geometry, placement: { anchor: bimAnchor, rotationDeg: bimRotation }, seq: 0 } : undefined),
+    [bimModel, bimAnchor, bimRotation],
+  );
 
   useEffect(() => {
     runtime.start();
@@ -31,6 +44,7 @@ export default function App() {
     ['alerts', `Alertas${snapshot.alerts.length ? ` (${snapshot.alerts.length})` : ''}`],
     ['sources', 'Fuentes'],
     ['layers', 'Capas'],
+    ['analysis', 'Análisis'],
     ['scenarios', 'Escenarios'],
   ];
 
@@ -53,6 +67,11 @@ export default function App() {
         perf={perf}
         focus={focus}
         onBaseMap={setBaseMapOnline}
+        onMapReady={(m) => {
+          setMap(m);
+          if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = m;
+        }}
+        bim={bim}
       />
 
       {baseMapOnline === false && <div className="toast">Cartografía base no disponible: se muestran solo las capas de datos.</div>}
@@ -69,8 +88,24 @@ export default function App() {
         </nav>
         <div className="panel-body">
           {tab === 'alerts' && <AlertsPanel alerts={snapshot.alerts} onFocus={(p) => { setFocus({ lngLat: p, seq: Date.now() }); if (window.innerWidth < 760) setCollapsed(true); }} />}
-          {tab === 'sources' && <SourcesPanel sources={snapshot.sources} perf={perf} baseMapOnline={baseMapOnline} />}
-          {tab === 'layers' && <LayersPanel layers={layers} onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))} />}
+          {tab === 'sources' && <SourcesPanel sources={snapshot.sources} perf={perf} baseMapOnline={baseMapOnline} districtsOfficial={snapshot.districtsOfficial} />}
+          {tab === 'layers' && (
+            <LayersPanel layers={layers} onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}>
+              <BimPanel
+                model={bimModel}
+                rotation={bimRotation}
+                onLoaded={(m) => {
+                  setBimModel(m);
+                  setLayers((l) => ({ ...l, bim: true }));
+                  setFocus({ lngLat: bimAnchor, seq: Date.now(), zoom: 16.5 });
+                }}
+                onRotate={setBimRotation}
+                onPlaceAtCenter={() => map && setBimAnchor(map.getCenter().toArray() as LngLat)}
+                onRemove={() => setBimModel(undefined)}
+              />
+            </LayersPanel>
+          )}
+          {tab === 'analysis' && <AnalysisPanel history={snapshot.history} />}
           {tab === 'scenarios' && <ScenariosPanel active={snapshot.overridesActive} onRun={(s) => { runtime.triggerScenario(s); if (s !== 'reset') setTab('alerts'); }} />}
         </div>
       </aside>

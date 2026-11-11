@@ -87,3 +87,25 @@ export function alertsGeo(alerts: Alert[]) {
   }
   return fc(features);
 }
+
+const SEVERITY_RANK = { none: 0, info: 1, warning: 2, critical: 3 } as const;
+
+/** Distritos con la severidad de su peor alerta activa (para el coropletas). */
+export function districtsGeo(districts: import('../adapters/districts').District[], alerts: Alert[]) {
+  const worst = new Map<string, keyof typeof SEVERITY_RANK>();
+  for (const a of alerts) {
+    const zones = a.zoneId === 'ciudad' ? districts.map((d) => d.zoneId) : [a.zoneId];
+    for (const z of zones) {
+      const cur = worst.get(z) ?? 'none';
+      if (SEVERITY_RANK[a.severity] > SEVERITY_RANK[cur]) worst.set(z, a.severity);
+    }
+  }
+  return fc(districts.map((d) => ({
+    type: 'Feature',
+    geometry: { type: 'MultiPolygon', coordinates: d.polygons },
+    properties: {
+      kind: 'district', name: d.name, severity: worst.get(d.zoneId) ?? 'none',
+      alerts: alerts.filter((a) => a.zoneId === d.zoneId).length,
+    },
+  })));
+}

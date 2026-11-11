@@ -55,7 +55,7 @@ describe('motor de reglas', () => {
     const s = base();
     s.weather!.precipitation = 18;
     const r3 = evaluateRules(s, 0).filter((a) => a.ruleId === 'R3');
-    expect(r3.map((a) => a.zoneId).sort()).toEqual(['camins', 'poblats-maritims', 'quatre-carreres']);
+    expect(r3.map((a) => a.zoneId).sort()).toEqual(['camins', 'poblats-maritims', 'pobles-sud', 'quatre-carreres']);
     expect(r3.every((a) => a.severity === 'warning')).toBe(true);
     s.metro[0] = { ...s.metro[0], status: 'interrupted' };
     expect(evaluateRules(s, 0).filter((a) => a.ruleId === 'R3').every((a) => a.severity === 'critical')).toBe(true);

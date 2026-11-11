@@ -5,11 +5,13 @@ import type { Snapshot } from '../core/store';
 import type { PerfSettings } from '../core/device';
 import type { LngLat } from '../core/types';
 import { VALENCIA_BOUNDS, VALENCIA_CENTER } from '../data/static';
+import type { IfcGeometry } from '../bim/ifc';
+import type { BimPlacement } from '../bim/BimLayer';
 import {
-  TRAFFIC_COLORS, airGeo, alertsGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
+  TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
+export type LayerKey = 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -36,6 +38,10 @@ async function loadBaseStyle(): Promise<{ style: StyleSpecification; online: boo
 
 /** Qué capas de MapLibre controla cada interruptor. */
 const LAYER_GROUPS: Record<LayerKey, string[]> = {
+  districts: ['vlc-districts-fill', 'vlc-districts-line'],
+  ortho: ['vlc-ortho'],
+  terrain: [],
+  bim: ['vlc-bim'],
   buildings: ['vlc-buildings'],
   traffic: ['vlc-traffic-casing', 'vlc-traffic'],
   bikes: ['vlc-bikes'],
@@ -51,8 +57,33 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
 const SEVERITY_COLOR = ['match', ['get', 'severity'], 'critical', '#dc2626', 'warning', '#f59e0b', '#3b82f6'] as unknown as string;
 const NO2_COLOR = ['step', ['get', 'no2'], '#94a3b8', 0, '#22c55e', 40, '#84cc16', 90, '#f59e0b', 150, '#ef4444', 200, '#7f1d1d'] as unknown as string;
 
+/** Ortofoto PNOA de máxima actualidad (© Instituto Geográfico Nacional), servicio WMTS. */
+const PNOA_TILES = 'https://www.ign.es/wmts/pnoa-ma?layer=OI.OrthoimageCoverage&style=default&tilematrixset=GoogleMapsCompatible&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/jpeg&TileMatrix={z}&TileCol={x}&TileRow={y}';
+/** Modelo digital de elevaciones global (Terrarium, AWS Open Data). */
+const TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+
 function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean) {
   const empty = { type: 'FeatureCollection' as const, features: [] };
+  map.addSource('vlc-ortho', {
+    type: 'raster', tiles: [PNOA_TILES], tileSize: 256, maxzoom: 19,
+    attribution: 'Ortofoto PNOA © <a href="https://www.ign.es" target="_blank">Instituto Geográfico Nacional</a>',
+  });
+  map.addSource('vlc-terrain', {
+    type: 'raster-dem', tiles: [TERRAIN_TILES], tileSize: 256, maxzoom: 15, encoding: 'terrarium',
+    attribution: 'Relieve: Mapzen Terrain Tiles (AWS Open Data)',
+  });
+  map.addSource('vlc-districts', { type: 'geojson', data: empty });
+  // La ortofoto y los distritos van por debajo de calles y etiquetas del mapa base
+  const firstLine = map.getStyle().layers?.find((l) => l.type === 'line' || l.type === 'symbol')?.id;
+  map.addLayer({ id: 'vlc-ortho', type: 'raster', source: 'vlc-ortho', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.95 } }, firstLine);
+  map.addLayer({ id: 'vlc-districts-fill', type: 'fill', source: 'vlc-districts',
+    paint: {
+      'fill-color': ['match', ['get', 'severity'], 'critical', '#d03b3b', 'warning', '#fab219', 'info', '#3987e5', '#64748b'],
+      'fill-opacity': ['match', ['get', 'severity'], 'none', 0.04, 0.22],
+    } }, firstLine);
+  map.addLayer({ id: 'vlc-districts-line', type: 'line', source: 'vlc-districts',
+    paint: { 'line-color': '#334155', 'line-width': 1.2, 'line-dasharray': [3, 2], 'line-opacity': 0.7 } }, firstLine);
+
   for (const id of ['traffic', 'bikes', 'air', 'noise', 'metro', 'port', 'incidents', 'alerts', 'landmarks']) {
     map.addSource(`vlc-${id}`, { type: 'geojson', data: empty });
   }
@@ -132,6 +163,7 @@ function popupHtml(p: Record<string, unknown>): string {
   const rows = (pairs: [string, unknown][]) => pairs.map(([k, v]) => `<tr><th>${k}</th><td>${esc(fmt(v))}</td></tr>`).join('');
   const title = `<strong>${esc(p.name)}</strong>`;
   switch (p.kind) {
+    case 'district': return `${title}<table>${rows([['Alertas activas', p.alerts]])}</table>`;
     case 'traffic': return `${title}<table>${rows([['Estado', p.label]])}</table>`;
     case 'bike': return `${title}<table>${rows([['Bicis', p.available], ['Anclajes libres', p.free], ['Total', p.total]])}</table>`;
     case 'air': return `${title}<table>${rows([['NO₂ µg/m³', p.no2], ['PM10 µg/m³', p.pm10], ['PM2.5 µg/m³', p.pm25], ['O₃ µg/m³', p.o3], ...(p.quality ? [['Calidad', p.quality] as [string, unknown]] : [])])}</table>`;
@@ -147,11 +179,13 @@ interface Props {
   snapshot: Snapshot;
   layers: Record<LayerKey, boolean>;
   perf: PerfSettings;
-  focus?: { lngLat: LngLat; seq: number };
+  focus?: { lngLat: LngLat; seq: number; zoom?: number };
   onBaseMap?: (online: boolean) => void;
+  onMapReady?: (map: MlMap) => void;
+  bim?: { geometry: IfcGeometry; placement: BimPlacement; seq: number };
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -180,8 +214,9 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap }: Props) {
         addOverlays(map!, perf, online && !!map!.getSource('openmaptiles'));
         mapRef.current = map!;
         setReady(true);
+        onMapReady?.(map!);
       });
-      const clickable = ['vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
+      const clickable = ['vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
       for (const id of clickable) {
         map.on('click', id, (e) => {
           const f = e.features?.[0];
@@ -215,6 +250,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap }: Props) {
     set('incidents', incidentsGeo(s));
     set('alerts', alertsGeo(snapshot.alerts));
     set('landmarks', landmarksGeo());
+    set('districts', districtsGeo(snapshot.districts, snapshot.alerts));
   }, [snapshot, ready]);
 
   // Interruptores de capas
@@ -224,10 +260,44 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap }: Props) {
     for (const [key, ids] of Object.entries(LAYER_GROUPS) as [LayerKey, string[]][]) {
       for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers[key] ? 'visible' : 'none');
     }
+    map.setTerrain(layers.terrain ? { source: 'vlc-terrain', exaggeration: 1.5 } : null);
   }, [layers, ready]);
 
+  // Modelo BIM (three.js se carga solo si hay modelo)
+  const bimLayer = useRef<import('../bim/BimLayer').BimLayer | null>(null);
+  const bimGeometry = useRef<IfcGeometry | null>(null);
   useEffect(() => {
-    if (focus && mapRef.current) mapRef.current.flyTo({ center: focus.lngLat, zoom: 15.5, pitch: 60, speed: 1.2 });
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (!bim) {
+      if (map.getLayer('vlc-bim')) map.removeLayer('vlc-bim');
+      bimLayer.current = null;
+      bimGeometry.current = null;
+      return;
+    }
+    let cancelled = false;
+    import('../bim/BimLayer').then(({ BimLayer, buildBimMesh }) => {
+      if (cancelled) return;
+      const altitude = layers.terrain ? map.queryTerrainElevation(bim.placement.anchor) ?? 0 : 0;
+      const placement = { ...bim.placement, altitude };
+      if (bimLayer.current && bimGeometry.current === bim.geometry) {
+        bimLayer.current.setPlacement(placement);
+        return;
+      }
+      if (map.getLayer('vlc-bim')) map.removeLayer('vlc-bim');
+      bimLayer.current = new BimLayer('vlc-bim', buildBimMesh(bim.geometry), placement);
+      bimGeometry.current = bim.geometry;
+      map.addLayer(bimLayer.current, map.getLayer('vlc-traffic-casing') ? 'vlc-traffic-casing' : undefined);
+      map.setLayoutProperty('vlc-bim', 'visibility', layers.bim ? 'visible' : 'none');
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bim, ready]);
+
+  useEffect(() => {
+    if (focus && mapRef.current) mapRef.current.flyTo({ center: focus.lngLat, zoom: focus.zoom ?? 15.5, pitch: 60, speed: 1.2 });
   }, [focus]);
 
   return <div ref={container} className="map" />;

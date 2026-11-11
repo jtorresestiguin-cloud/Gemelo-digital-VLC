@@ -7,6 +7,7 @@ import { CityStore } from './store';
 import type { SourceId } from './types';
 import { decodeRaw } from '../adapters/decoders';
 import { fetchAir, fetchBikes, fetchTraffic, fetchWeather } from '../adapters/opendata';
+import { approximateDistricts, fetchDistricts } from '../adapters/districts';
 import type { RawMessage, ScenarioName, SimSource, WorkerCommand } from '../sim/protocols';
 
 const MIN = 60_000;
@@ -21,6 +22,11 @@ export class CityRuntime {
   start(): void {
     if (this.unsubscribe) return;
     this.unsubscribe = this.bus.subscribe('*', (m) => this.store.apply(m));
+
+    this.store.setDistricts(approximateDistricts(), false);
+    fetchDistricts()
+      .then((d) => this.store.setDistricts(d, true))
+      .catch(() => { /* se mantienen los límites aproximados */ });
 
     this.worker = new Worker(new URL('../sim/sim.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<RawMessage>) => {

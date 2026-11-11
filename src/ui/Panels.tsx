@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { Snapshot } from '../core/store';
 import type { Alert, LngLat, SourceStatus } from '../core/types';
 import type { LayerKey } from '../map/CityMap';
@@ -75,7 +76,7 @@ export function AlertsPanel({ alerts, onFocus }: { alerts: Alert[]; onFocus: (p:
   );
 }
 
-export function SourcesPanel({ sources, perf, baseMapOnline }: { sources: SourceStatus[]; perf: PerfSettings; baseMapOnline?: boolean }) {
+export function SourcesPanel({ sources, perf, baseMapOnline, districtsOfficial }: { sources: SourceStatus[]; perf: PerfSettings; baseMapOnline?: boolean; districtsOfficial: boolean }) {
   return (
     <>
       <ul className="sources">
@@ -92,6 +93,7 @@ export function SourcesPanel({ sources, perf, baseMapOnline }: { sources: Source
       </ul>
       <div className="note">
         <p><strong>Cartografía:</strong> {baseMapOnline === false ? 'no disponible (modo sin conexión)' : 'OpenStreetMap vía OpenFreeMap, edificios con altura real'}.</p>
+        <p><strong>Límites de distrito:</strong> {districtsOfficial ? 'oficiales (datos abiertos del Ajuntament)' : 'aproximados a partir de los centroides (el servicio oficial no responde)'}.</p>
         <p><strong>Perfil de rendimiento:</strong> {perf.profile} (pixel ratio {perf.pixelRatio}, edificios desde zoom {perf.buildingsMinZoom}).</p>
         <p className="muted small">Los datos públicos (tráfico, Valenbisi, calidad del aire, meteorología) son reales cuando la API responde. Los sistemas cerrados (sensores IoT, Metrovalencia, PLCs del puerto) están simulados con el formato exacto de cada protocolo, listos para conectar drivers reales.</p>
       </div>
@@ -100,11 +102,12 @@ export function SourcesPanel({ sources, perf, baseMapOnline }: { sources: Source
 }
 
 const LAYER_LABELS: Record<LayerKey, string> = {
-  buildings: 'Edificios 3D', traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Calidad del aire', noise: 'Ruido (IoT)',
+  districts: 'Distritos (coloreados por alertas)', ortho: 'Ortofoto PNOA (IGN)', terrain: 'Relieve 3D',
+  bim: 'Modelo BIM', buildings: 'Edificios 3D', traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Calidad del aire', noise: 'Ruido (IoT)',
   metro: 'Metro', port: 'Puerto', incidents: 'Incidencias', alerts: 'Alertas y rutas', landmarks: 'Puntos de interés',
 };
 
-export function LayersPanel({ layers, onToggle }: { layers: Record<LayerKey, boolean>; onToggle: (k: LayerKey) => void }) {
+export function LayersPanel({ layers, onToggle, children }: { layers: Record<LayerKey, boolean>; onToggle: (k: LayerKey) => void; children?: React.ReactNode }) {
   return (
     <div className="layers">
       {(Object.keys(LAYER_LABELS) as LayerKey[]).map((k) => (
@@ -125,6 +128,7 @@ export function LayersPanel({ layers, onToggle }: { layers: Record<LayerKey, boo
         <span><i style={{ background: '#ef4444' }} />150–200</span>
         <span><i style={{ background: '#7f1d1d' }} />&gt;200</span>
       </div>
+      {children}
     </div>
   );
 }

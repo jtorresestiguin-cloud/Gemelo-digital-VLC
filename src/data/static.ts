@@ -6,36 +6,41 @@ import type { LngLat, MetroLine } from '../core/types';
 
 export const VALENCIA_CENTER: LngLat = [-0.3763, 39.4699];
 export const VALENCIA_BOUNDS: [LngLat, LngLat] = [
-  [-0.44, 39.42],
-  [-0.30, 39.52],
+  [-0.46, 39.30],
+  [-0.28, 39.57],
 ];
 
 export interface Zone {
   id: string;
+  /** código oficial de distrito del Ajuntament (1–19) */
+  code: number;
   name: string;
   center: LngLat;
   /** zonas bajas / cercanas al mar o a barrancos, más expuestas a lluvias torrenciales */
   floodProne?: boolean;
 }
 
-/** Los 16 distritos urbanos de València (centroides aproximados). */
+/** Los 19 distritos de València (centroides aproximados). */
 export const ZONES: Zone[] = [
-  { id: 'ciutat-vella', name: 'Ciutat Vella', center: [-0.3766, 39.4747] },
-  { id: 'eixample', name: "L'Eixample", center: [-0.3700, 39.4640] },
-  { id: 'extramurs', name: 'Extramurs', center: [-0.3880, 39.4690] },
-  { id: 'campanar', name: 'Campanar', center: [-0.3970, 39.4840] },
-  { id: 'saidia', name: 'La Saïdia', center: [-0.3790, 39.4880] },
-  { id: 'pla-del-real', name: 'El Pla del Real', center: [-0.3600, 39.4790] },
-  { id: 'olivereta', name: "L'Olivereta", center: [-0.4040, 39.4700] },
-  { id: 'patraix', name: 'Patraix', center: [-0.3970, 39.4590] },
-  { id: 'jesus', name: 'Jesús', center: [-0.3850, 39.4530] },
-  { id: 'quatre-carreres', name: 'Quatre Carreres', center: [-0.3650, 39.4500], floodProne: true },
-  { id: 'poblats-maritims', name: 'Poblats Marítims', center: [-0.3300, 39.4650], floodProne: true },
-  { id: 'camins', name: 'Camins al Grau', center: [-0.3500, 39.4650], floodProne: true },
-  { id: 'algiros', name: 'Algirós', center: [-0.3470, 39.4770] },
-  { id: 'benimaclet', name: 'Benimaclet', center: [-0.3600, 39.4870] },
-  { id: 'rascanya', name: 'Rascanya', center: [-0.3720, 39.4960] },
-  { id: 'benicalap', name: 'Benicalap', center: [-0.3950, 39.4960] },
+  { id: 'ciutat-vella', code: 1, name: 'Ciutat Vella', center: [-0.3766, 39.4747] },
+  { id: 'eixample', code: 2, name: "L'Eixample", center: [-0.3700, 39.4640] },
+  { id: 'extramurs', code: 3, name: 'Extramurs', center: [-0.3880, 39.4690] },
+  { id: 'campanar', code: 4, name: 'Campanar', center: [-0.3970, 39.4840] },
+  { id: 'saidia', code: 5, name: 'La Saïdia', center: [-0.3790, 39.4880] },
+  { id: 'pla-del-real', code: 6, name: 'El Pla del Real', center: [-0.3600, 39.4790] },
+  { id: 'olivereta', code: 7, name: "L'Olivereta", center: [-0.4040, 39.4700] },
+  { id: 'patraix', code: 8, name: 'Patraix', center: [-0.3970, 39.4590] },
+  { id: 'jesus', code: 9, name: 'Jesús', center: [-0.3850, 39.4530] },
+  { id: 'quatre-carreres', code: 10, name: 'Quatre Carreres', center: [-0.3650, 39.4500], floodProne: true },
+  { id: 'poblats-maritims', code: 11, name: 'Poblats Marítims', center: [-0.3300, 39.4650], floodProne: true },
+  { id: 'camins', code: 12, name: 'Camins al Grau', center: [-0.3500, 39.4650], floodProne: true },
+  { id: 'algiros', code: 13, name: 'Algirós', center: [-0.3470, 39.4770] },
+  { id: 'benimaclet', code: 14, name: 'Benimaclet', center: [-0.3600, 39.4870] },
+  { id: 'rascanya', code: 15, name: 'Rascanya', center: [-0.3720, 39.4960] },
+  { id: 'benicalap', code: 16, name: 'Benicalap', center: [-0.3950, 39.4960] },
+  { id: 'pobles-nord', code: 17, name: 'Pobles del Nord', center: [-0.3720, 39.5220] },
+  { id: 'pobles-oest', code: 18, name: "Pobles de l'Oest", center: [-0.4280, 39.4950] },
+  { id: 'pobles-sud', code: 19, name: 'Pobles del Sud', center: [-0.3420, 39.3900], floodProne: true },
 ];
 
 export const ZONE_BY_ID: Record<string, Zone> = Object.fromEntries(ZONES.map((z) => [z.id, z]));

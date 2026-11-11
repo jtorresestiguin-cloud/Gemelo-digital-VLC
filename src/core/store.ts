@@ -1,5 +1,8 @@
 import type { BusMessage } from './bus';
 import { evaluateRules } from './rules';
+import { setDistrictPolygons, zoneFor, midpoint } from './geo';
+import { KpiHistory, kpisOf, type KpiSample } from './history';
+import type { District } from '../adapters/districts';
 import type { Alert, CityState, SourceId, SourceStatus, Weather } from './types';
 
 export interface Overrides {
@@ -13,6 +16,9 @@ export interface Snapshot {
   sources: SourceStatus[];
   alerts: Alert[];
   overridesActive: boolean;
+  districts: District[];
+  districtsOfficial: boolean;
+  history: KpiSample[];
   updatedAt: number;
 }
 
@@ -37,8 +43,12 @@ export class CityStore {
   private snapshot: Snapshot;
   private listeners = new Set<() => void>();
   private pending: ReturnType<typeof setTimeout> | null = null;
+  private districts: District[] = [];
+  private districtsOfficial = false;
+  readonly history: KpiHistory;
 
-  constructor(private throttleMs = 400) {
+  constructor(private throttleMs = 400, persistHistory = typeof localStorage !== 'undefined') {
+    this.history = new KpiHistory(30_000, 24 * 3600_000, persistHistory);
     this.snapshot = this.build(Date.now());
   }
 
@@ -87,6 +97,20 @@ export class CityStore {
     this.schedule();
   }
 
+  /** Cambia los límites de distrito y reasigna todos los elementos ya recibidos. */
+  setDistricts(districts: District[], official: boolean): void {
+    this.districts = districts;
+    this.districtsOfficial = official;
+    setDistrictPolygons(official ? districts : null);
+    const r = this.raw;
+    r.traffic = r.traffic.map((s) => ({ ...s, zoneId: zoneFor(midpoint(s.coords)) }));
+    r.bikes = r.bikes.map((b) => ({ ...b, zoneId: zoneFor(b.lngLat) }));
+    r.air = r.air.map((a) => ({ ...a, zoneId: zoneFor(a.lngLat) }));
+    r.noise = r.noise.map((n) => ({ ...n, zoneId: zoneFor(n.lngLat) }));
+    r.incidents = r.incidents.map((i) => ({ ...i, zoneId: zoneFor(i.lngLat) }));
+    this.flush();
+  }
+
   setOverrides(fn: (o: Overrides) => Overrides): void {
     this.overrides = fn(this.overrides);
     this.flush();
@@ -111,11 +135,16 @@ export class CityStore {
     const state = this.effective(now);
     this.alerts = evaluateRules(state, now, this.alerts);
     const o = this.overrides;
+    // solo se registran muestras cuando hay datos de tráfico (evita ceros al arrancar)
+    if (state.traffic.length) this.history.add(kpisOf(state, this.alerts, now));
     return {
       state,
       sources: [...this.sources.values()],
       alerts: this.alerts,
       overridesActive: (o.rain?.until ?? 0) > now || (o.no2?.until ?? 0) > now || o.congest.some((c) => c.until > now),
+      districts: this.districts,
+      districtsOfficial: this.districtsOfficial,
+      history: this.history.samples,
       updatedAt: now,
     };
   }
