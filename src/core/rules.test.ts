@@ -8,7 +8,7 @@ const seg = (id: string, zoneId: string, state: TrafficSegment['state']): Traffi
 });
 
 const base = (): CityState => ({
-  traffic: [], bikes: [], air: [], incidents: [], noise: [],
+  traffic: [], bikes: [], air: [], incidents: [], noise: [], services: [],
   metro: METRO_LINES.map((l) => ({ ...l, delayMin: 0, status: 'ok' as const })),
   weather: { temperature: 20, precipitation: 0, windSpeed: 5, weatherCode: 0 },
 });
@@ -67,6 +67,31 @@ describe('motor de reglas', () => {
     expect(evaluateRules(s, 0).some((a) => a.ruleId === 'R4')).toBe(false);
     s.traffic = [seg('p', 'poblats-maritims', 'congested')];
     expect(evaluateRules(s, 0).find((a) => a.ruleId === 'R4')?.zoneId).toBe('poblats-maritims');
+  });
+
+  it('R1 y R3 usan los servicios públicos: hospital más cercano y equipamientos sensibles', () => {
+    const s = base();
+    s.services = [
+      { id: 'h1', name: 'Hospital Lejano', category: 'health', kind: 'Hospital', lngLat: [-0.40, 39.49], zoneId: 'campanar', emergency: true },
+      { id: 'h2', name: 'Hospital Cercano', category: 'health', kind: 'Hospital', lngLat: [-0.346, 39.463], zoneId: 'camins', emergency: true },
+      { id: 'h3', name: 'Clínica sin urgencias', category: 'health', kind: 'Hospital', lngLat: [-0.3451, 39.4621], zoneId: 'camins' },
+      { id: 'c1', name: 'CEIP A', category: 'education', kind: 'Colegio / instituto', lngLat: [-0.35, 39.465], zoneId: 'camins' },
+      { id: 'c2', name: 'EI B', category: 'education', kind: 'Escuela infantil', lngLat: [-0.35, 39.466], zoneId: 'camins' },
+      { id: 'f1', name: 'Farmacia', category: 'health', kind: 'Farmacia', lngLat: [-0.35, 39.466], zoneId: 'camins' },
+      { id: 'r1', name: 'Residencia', category: 'social', kind: 'Servicio social / residencia', lngLat: [-0.35, 39.467], zoneId: 'camins' },
+    ];
+    s.traffic = [seg('a', 'camins', 'congested'), seg('b', 'camins', 'congested')];
+    s.incidents = [{ id: 'i1', type: 'accident', lngLat: [-0.345, 39.462], zoneId: 'camins', severity: 3, ts: 0 }];
+    s.weather!.precipitation = 18;
+    const alerts = evaluateRules(s, 0);
+    const r1 = alerts.find((a) => a.ruleId === 'R1')!;
+    expect(r1.description).toContain('Hospital Cercano');
+    expect(r1.sources).toContain('services');
+    const r3 = alerts.find((a) => a.ruleId === 'R3' && a.zoneId === 'camins')!;
+    expect(r3.description).toContain('2 colegios o escuelas infantiles');
+    expect(r3.description).toContain('2 centros sanitarios');
+    expect(r3.description).toContain('1 servicios sociales');
+    expect(r3.recommendation?.text).toContain('colegios');
   });
 
   it('conserva la fecha de inicio de alertas que siguen activas', () => {

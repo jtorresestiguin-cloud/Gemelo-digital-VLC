@@ -2,7 +2,7 @@
 export type LngLat = [number, number];
 
 export type Protocol = 'REST' | 'MQTT' | 'NGSI-LD' | 'GTFS-RT' | 'OPC-UA';
-export type SourceId = 'traffic' | 'bikes' | 'air' | 'weather' | 'iot' | 'metro' | 'port';
+export type SourceId = 'traffic' | 'bikes' | 'air' | 'weather' | 'iot' | 'metro' | 'port' | 'services';
 export type SourceMode = 'connecting' | 'live' | 'simulated' | 'error';
 
 export interface SourceStatus {
@@ -96,6 +96,25 @@ export interface PortState {
   berthOccupancy: number;
 }
 
+export type ServiceCategory =
+  | 'health' | 'education' | 'culture' | 'sport' | 'social' | 'market' | 'administration' | 'emergency';
+
+export interface PublicService {
+  id: string;
+  name: string;
+  category: ServiceCategory;
+  /** tipo concreto (Hospital, Farmacia, Biblioteca…) */
+  kind: string;
+  lngLat: LngLat;
+  zoneId: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  openingHours?: string;
+  /** hospital con urgencias */
+  emergency?: boolean;
+}
+
 export interface CityState {
   traffic: TrafficSegment[];
   bikes: BikeStation[];
@@ -105,6 +124,7 @@ export interface CityState {
   noise: NoiseSensor[];
   metro: MetroLine[];
   port?: PortState;
+  services: PublicService[];
 }
 
 export type Severity = 'info' | 'warning' | 'critical';

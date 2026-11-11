@@ -6,6 +6,9 @@ import { CityMap, type LayerKey } from './map/CityMap';
 import { AlertsPanel, KpiBar, LayersPanel, ScenariosPanel, SourcesPanel } from './ui/Panels';
 import { AnalysisPanel } from './ui/AnalysisPanel';
 import { BimPanel, type BimModel } from './ui/BimPanel';
+import { ServicesPanel } from './ui/ServicesPanel';
+import { SERVICE_CATEGORIES } from './adapters/services';
+import type { ServiceCategory } from './core/types';
 import type { Map as MlMap } from 'maplibre-gl';
 import { PORT_ASSETS } from './data/static';
 
@@ -13,7 +16,7 @@ const runtime = new CityRuntime();
 type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 
 const ALL_LAYERS: Record<LayerKey, boolean> = {
-  districts: true, ortho: false, terrain: false, bim: true,
+  services: true, districts: true, ortho: false, terrain: false, bim: true,
   buildings: true, traffic: true, bikes: true, air: true, noise: false, metro: true, port: true, incidents: true, alerts: true, landmarks: true,
 };
 
@@ -26,6 +29,7 @@ export default function App() {
   const [baseMapOnline, setBaseMapOnline] = useState<boolean>();
   const [collapsed, setCollapsed] = useState(false);
   const [map, setMap] = useState<MlMap>();
+  const [serviceCats, setServiceCats] = useState<ServiceCategory[]>(SERVICE_CATEGORIES.map((c) => c.id));
   const [bimModel, setBimModel] = useState<BimModel>();
   const [bimAnchor, setBimAnchor] = useState<LngLat>(PORT_ASSETS[0].lngLat);
   const [bimRotation, setBimRotation] = useState(32);
@@ -72,6 +76,7 @@ export default function App() {
           if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = m;
         }}
         bim={bim}
+        serviceCategories={serviceCats}
       />
 
       {baseMapOnline === false && <div className="toast">Cartografía base no disponible: se muestran solo las capas de datos.</div>}
@@ -90,7 +95,25 @@ export default function App() {
           {tab === 'alerts' && <AlertsPanel alerts={snapshot.alerts} onFocus={(p) => { setFocus({ lngLat: p, seq: Date.now() }); if (window.innerWidth < 760) setCollapsed(true); }} />}
           {tab === 'sources' && <SourcesPanel sources={snapshot.sources} perf={perf} baseMapOnline={baseMapOnline} districtsOfficial={snapshot.districtsOfficial} />}
           {tab === 'layers' && (
-            <LayersPanel layers={layers} onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}>
+            <LayersPanel
+              layers={layers}
+              onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
+              header={
+                <ServicesPanel
+                  services={snapshot.state.services}
+                  status={snapshot.sources.find((s) => s.id === 'services')}
+                  enabled={serviceCats}
+                  onChange={(c) => {
+                    setServiceCats(c);
+                    if (c.length) setLayers((l) => ({ ...l, services: true }));
+                  }}
+                  onFocus={(p) => {
+                    setFocus({ lngLat: p, seq: Date.now(), zoom: 17 });
+                    if (window.innerWidth < 760) setCollapsed(true);
+                  }}
+                />
+              }
+            >
               <BimPanel
                 model={bimModel}
                 rotation={bimRotation}

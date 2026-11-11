@@ -8,6 +8,7 @@ import type { SourceId } from './types';
 import { decodeRaw } from '../adapters/decoders';
 import { fetchAir, fetchBikes, fetchTraffic, fetchWeather } from '../adapters/opendata';
 import { approximateDistricts, fetchDistricts } from '../adapters/districts';
+import { SERVICES_TTL, fetchServices, readServicesCache } from '../adapters/services';
 import type { RawMessage, ScenarioName, SimSource, WorkerCommand } from '../sim/protocols';
 
 const MIN = 60_000;
@@ -36,7 +37,38 @@ export class CityRuntime {
     this.poll('traffic', 3 * MIN, async () => this.bus.publish({ source: 'traffic', protocol: 'REST', topic: 'traffic', data: await fetchTraffic(), live: true, ts: Date.now() }));
     this.poll('bikes', 2 * MIN, async () => this.bus.publish({ source: 'bikes', protocol: 'REST', topic: 'bikes', data: await fetchBikes(), live: true, ts: Date.now() }));
     this.poll('air', 10 * MIN, async () => this.bus.publish({ source: 'air', protocol: 'REST', topic: 'air', data: await fetchAir(), live: true, ts: Date.now() }));
+    this.startServices();
     this.poll('weather', 10 * MIN, async () => this.bus.publish({ source: 'weather', protocol: 'REST', topic: 'weather', data: await fetchWeather(), live: true, ts: Date.now() }));
+  }
+
+  /** Servicios públicos: caché local de 24 h; se refrescan por API al caducar. */
+  private startServices(): void {
+    const publish = (data: import('./types').PublicService[], t: number) => {
+      this.bus.publish({ source: 'services', protocol: 'REST', topic: 'services', data, live: true, ts: Date.now() });
+      const h = Math.round((Date.now() - t) / 3600_000);
+      this.store.setSourceStatus('services', { detail: `${data.length} equipamientos · actualizado ${h ? `hace ${h} h` : 'ahora'}; se refresca cada 24 h` });
+    };
+    const refresh = async () => {
+      const cached = readServicesCache();
+      if (cached && Date.now() - cached.t < SERVICES_TTL) {
+        publish(cached.data, cached.t);
+        return;
+      }
+      try {
+        publish(await fetchServices(), Date.now());
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        if (cached) {
+          publish(cached.data, cached.t);
+          this.store.setSourceStatus('services', { detail: `API no disponible (${reason}); mostrando la última copia guardada` });
+        } else {
+          this.store.setSourceStatus('services', { mode: 'error', detail: `API no disponible (${reason}); se reintentará en 10 min` });
+        }
+      }
+    };
+    void refresh();
+    // comprueba cada 10 min: reintenta tras un error y refresca cuando caduca la caché
+    this.timers.push(setInterval(refresh, 10 * MIN));
   }
 
   stop(): void {

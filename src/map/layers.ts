@@ -109,3 +109,13 @@ export function districtsGeo(districts: import('../adapters/districts').District
     },
   })));
 }
+
+export const servicesGeo = (s: CityState) =>
+  fc(s.services.map((x) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: x.lngLat },
+    properties: {
+      kind: 'service', name: x.name, category: x.category, type: x.kind,
+      hospital: x.kind === 'Hospital', address: x.address ?? '', phone: x.phone ?? '', website: x.website ?? '',
+      hours: x.openingHours ?? '', emergency: !!x.emergency,
+    },
+  })));

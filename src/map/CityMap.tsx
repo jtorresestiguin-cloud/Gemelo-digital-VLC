@@ -3,15 +3,16 @@ import maplibregl, { type GeoJSONSource, type Map as MlMap, type StyleSpecificat
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Snapshot } from '../core/store';
 import type { PerfSettings } from '../core/device';
-import type { LngLat } from '../core/types';
+import type { LngLat, ServiceCategory } from '../core/types';
+import { SERVICE_CATEGORIES } from '../adapters/services';
 import { VALENCIA_BOUNDS, VALENCIA_CENTER } from '../data/static';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import {
-  TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
+  TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
+export type LayerKey = 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -38,6 +39,7 @@ async function loadBaseStyle(): Promise<{ style: StyleSpecification; online: boo
 
 /** Qué capas de MapLibre controla cada interruptor. */
 const LAYER_GROUPS: Record<LayerKey, string[]> = {
+  services: ['vlc-services'],
   districts: ['vlc-districts-fill', 'vlc-districts-line'],
   ortho: ['vlc-ortho'],
   terrain: [],
@@ -84,7 +86,7 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean) {
   map.addLayer({ id: 'vlc-districts-line', type: 'line', source: 'vlc-districts',
     paint: { 'line-color': '#334155', 'line-width': 1.2, 'line-dasharray': [3, 2], 'line-opacity': 0.7 } }, firstLine);
 
-  for (const id of ['traffic', 'bikes', 'air', 'noise', 'metro', 'port', 'incidents', 'alerts', 'landmarks']) {
+  for (const id of ['services', 'traffic', 'bikes', 'air', 'noise', 'metro', 'port', 'incidents', 'alerts', 'landmarks']) {
     map.addSource(`vlc-${id}`, { type: 'geojson', data: empty });
   }
 
@@ -118,6 +120,13 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean) {
     } });
   map.addLayer({ id: 'vlc-routes', type: 'line', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'route'],
     paint: { 'line-color': '#7c3aed', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
+  map.addLayer({ id: 'vlc-services', type: 'circle', source: 'vlc-services',
+    paint: {
+      'circle-color': ['match', ['get', 'category'], ...SERVICE_CATEGORIES.flatMap((c) => [c.id, c.color]), '#64748b'] as unknown as string,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['case', ['get', 'hospital'], 5, 2.5], 16, ['case', ['get', 'hospital'], 11, 6.5]],
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 0.6, 16, 1.8],
+    } });
   map.addLayer({ id: 'vlc-air-halo', type: 'circle', source: 'vlc-air',
     paint: { 'circle-color': NO2_COLOR, 'circle-opacity': 0.18, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 18, 16, 60] } });
   map.addLayer({ id: 'vlc-air', type: 'circle', source: 'vlc-air',
@@ -163,6 +172,16 @@ function popupHtml(p: Record<string, unknown>): string {
   const rows = (pairs: [string, unknown][]) => pairs.map(([k, v]) => `<tr><th>${k}</th><td>${esc(fmt(v))}</td></tr>`).join('');
   const title = `<strong>${esc(p.name)}</strong>`;
   switch (p.kind) {
+    case 'service': {
+      const cat = SERVICE_CATEGORIES.find((c) => c.id === p.category);
+      const pairs: [string, unknown][] = [['Tipo', p.type], ['Categoría', cat?.label]];
+      if (p.emergency) pairs.push(['Urgencias', 'Sí']);
+      if (p.address) pairs.push(['Dirección', p.address]);
+      if (p.hours) pairs.push(['Horario', p.hours]);
+      if (p.phone) pairs.push(['Teléfono', p.phone]);
+      const web = typeof p.website === 'string' && /^https?:\/\//.test(p.website) ? `<p><a href="${esc(p.website)}" target="_blank" rel="noopener">Web</a></p>` : '';
+      return `${title}<table>${rows(pairs)}</table>${web}<p class="src">Fuente: OpenStreetMap</p>`;
+    }
     case 'district': return `${title}<table>${rows([['Alertas activas', p.alerts]])}</table>`;
     case 'traffic': return `${title}<table>${rows([['Estado', p.label]])}</table>`;
     case 'bike': return `${title}<table>${rows([['Bicis', p.available], ['Anclajes libres', p.free], ['Total', p.total]])}</table>`;
@@ -183,9 +202,10 @@ interface Props {
   onBaseMap?: (online: boolean) => void;
   onMapReady?: (map: MlMap) => void;
   bim?: { geometry: IfcGeometry; placement: BimPlacement; seq: number };
+  serviceCategories: ServiceCategory[];
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -216,13 +236,18 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         setReady(true);
         onMapReady?.(map!);
       });
-      const clickable = ['vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
+      const clickable = ['vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
+      // Un único manejador: ficha solo del elemento más alto bajo el puntero (los distritos quedan debajo)
+      let popup: maplibregl.Popup | undefined;
+      map.on('click', (e) => {
+        const layers = clickable.filter((id) => map!.getLayer(id));
+        const pad = 4;
+        const f = map!.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers })[0];
+        popup?.remove();
+        if (!f) return;
+        popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(popupHtml(f.properties as Record<string, unknown>)).addTo(map!);
+      });
       for (const id of clickable) {
-        map.on('click', id, (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(popupHtml(f.properties as Record<string, unknown>)).addTo(map!);
-        });
         map.on('mouseenter', id, () => (map!.getCanvas().style.cursor = 'pointer'));
         map.on('mouseleave', id, () => (map!.getCanvas().style.cursor = ''));
       }
@@ -252,6 +277,19 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     set('landmarks', landmarksGeo());
     set('districts', districtsGeo(snapshot.districts, snapshot.alerts));
   }, [snapshot, ready]);
+
+  // Los servicios cambian poco: solo se recalculan cuando llega una nueva descarga
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    (map.getSource('vlc-services') as GeoJSONSource | undefined)?.setData(servicesGeo(snapshot.state));
+  }, [snapshot.state.services, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map?.getLayer('vlc-services')) return;
+    map.setFilter('vlc-services', ['in', ['get', 'category'], ['literal', serviceCategories]]);
+  }, [serviceCategories, ready]);
 
   // Interruptores de capas
   useEffect(() => {

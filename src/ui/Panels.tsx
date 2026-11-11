@@ -12,7 +12,7 @@ const MODE_LABEL: Record<SourceStatus['mode'], string> = {
 };
 const SEVERITY_LABEL = { critical: 'Crítica', warning: 'Aviso', info: 'Info' };
 const SOURCE_SHORT: Record<string, string> = {
-  traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Aire', weather: 'Meteo', iot: 'IoT', metro: 'Metro', port: 'Puerto',
+  traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Aire', weather: 'Meteo', iot: 'IoT', metro: 'Metro', port: 'Puerto', services: 'Servicios',
 };
 
 const ago = (ts?: number) => {
@@ -102,14 +102,17 @@ export function SourcesPanel({ sources, perf, baseMapOnline, districtsOfficial }
 }
 
 const LAYER_LABELS: Record<LayerKey, string> = {
+  services: 'Servicios públicos',
   districts: 'Distritos (coloreados por alertas)', ortho: 'Ortofoto PNOA (IGN)', terrain: 'Relieve 3D',
   bim: 'Modelo BIM', buildings: 'Edificios 3D', traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Calidad del aire', noise: 'Ruido (IoT)',
   metro: 'Metro', port: 'Puerto', incidents: 'Incidencias', alerts: 'Alertas y rutas', landmarks: 'Puntos de interés',
 };
 
-export function LayersPanel({ layers, onToggle, children }: { layers: Record<LayerKey, boolean>; onToggle: (k: LayerKey) => void; children?: React.ReactNode }) {
+export function LayersPanel({ layers, onToggle, children, header }: { layers: Record<LayerKey, boolean>; onToggle: (k: LayerKey) => void; children?: React.ReactNode; header?: React.ReactNode }) {
   return (
     <div className="layers">
+      {header}
+      <h4 className="layers-title">Capas</h4>
       {(Object.keys(LAYER_LABELS) as LayerKey[]).map((k) => (
         <label key={k}>
           <input type="checkbox" checked={layers[k]} onChange={() => onToggle(k)} /> {LAYER_LABELS[k]}

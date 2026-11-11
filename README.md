@@ -18,6 +18,10 @@ la ciudad en 3D.
   | Sensores IoT (ruido, incidencias) | MQTT | Simulado |
   | Metrovalencia | GTFS-Realtime | Simulado |
   | Port de València (PLCs) | OPC UA | Simulado |
+  | Servicios públicos | REST (API Overpass) | **Real**: OpenStreetMap |
+
+  Frecuencia de actualización por API: tráfico cada 3 min, Valenbisi cada 2 min, calidad del
+  aire y meteorología cada 10 min, servicios públicos cada 24 h (con copia local en el navegador).
 
   Si una API pública no responde, su simulador equivalente toma el relevo publicando
   entidades **FIWARE NGSI-LD** (Smart Data Models `TrafficFlowObserved`, `AirQualityObserved`,
@@ -37,6 +41,13 @@ la ciudad en 3D.
 - **La ciudad en 3D**: edificios de OpenStreetMap con su altura real (vía OpenFreeMap, sin
   clave), puntos de interés (Ciutat de les Arts i les Ciències, Micalet, Mercat Central…),
   **ortofoto PNOA** del IGN y **relieve 3D** (Terrain Tiles de AWS Open Data) activables.
+- **Todos los servicios públicos de la ciudad** (≈ miles de equipamientos de OpenStreetMap
+  dentro del término municipal), en 8 categorías: sanidad (hospitales, centros de salud,
+  farmacias…), educación, cultura, deporte, servicios sociales, mercados, administración y
+  emergencias (policía, bomberos, ambulancias). Filtro por categoría, buscador y ficha con
+  dirección, horario, teléfono y web. El motor de reglas los usa: R1 indica el hospital más
+  cercano al incidente, y R2/R3 enumeran los colegios, centros sanitarios y residencias
+  afectados del distrito.
 - **Los 19 distritos** con sus límites oficiales (portal de datos abiertos) coloreados según la
   peor alerta activa. Los elementos se asignan a su distrito por punto-en-polígono; si el
   servicio no responde, se usan polígonos aproximados (Voronoi de los centroides).

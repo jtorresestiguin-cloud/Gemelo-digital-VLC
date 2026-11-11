@@ -4,7 +4,8 @@
  */
 import type { Alert, CityState, LngLat, Severity, SourceId } from './types';
 import { ZONES, ZONE_BY_ID } from '../data/static';
-import { nearestMetroStation } from './geo';
+import { distanceKm, nearestMetroStation } from './geo';
+import type { PublicService } from './types';
 
 export const THRESHOLDS = {
   /** mm/h a partir de los que consideramos que llueve de forma relevante */
@@ -39,6 +40,34 @@ export interface ZoneSummary {
   maxPm10?: number;
   emptyBikeStations: number;
   maxNoise?: number;
+  /** equipamientos sensibles del distrito (para avisos y planes de emergencia) */
+  schools: number;
+  healthCentres: number;
+  socialCentres: number;
+}
+
+const isSchool = (s: PublicService) => s.category === 'education' && /Colegio|Escuela infantil/.test(s.kind);
+const isHealthCentre = (s: PublicService) => s.category === 'health' && s.kind !== 'Farmacia' && s.kind !== 'Consulta médica';
+
+/** Hospital más cercano (preferentemente con urgencias). */
+export function nearestHospital(services: PublicService[], p: LngLat): { service: PublicService; km: number } | undefined {
+  const hospitals = services.filter((s) => s.kind === 'Hospital');
+  const pool = hospitals.some((h) => h.emergency) ? hospitals.filter((h) => h.emergency) : hospitals;
+  let best: { service: PublicService; km: number } | undefined;
+  for (const h of pool) {
+    const km = distanceKm(p, h.lngLat);
+    if (!best || km < best.km) best = { service: h, km };
+  }
+  return best;
+}
+
+function facilitiesText(z: ZoneSummary): string {
+  const parts = [
+    z.schools && `${z.schools} colegios o escuelas infantiles`,
+    z.healthCentres && `${z.healthCentres} centros sanitarios`,
+    z.socialCentres && `${z.socialCentres} servicios sociales o residencias`,
+  ].filter(Boolean);
+  return parts.length ? ` Equipamientos sensibles en el distrito: ${parts.join(', ')}.` : '';
 }
 
 const maxDefined = (a: number | undefined, b: number | undefined) =>
@@ -50,6 +79,7 @@ export function summarizeZones(state: CityState): Map<string, ZoneSummary> {
     out.set(z.id, {
       zoneId: z.id, segments: 0, congested: 0, closed: 0, congestionRatio: 0,
       incidents: 0, maxIncidentSeverity: 0, emptyBikeStations: 0,
+      schools: 0, healthCentres: 0, socialCentres: 0,
     });
   }
   const get = (id: string) => out.get(id);
@@ -84,6 +114,13 @@ export function summarizeZones(state: CityState): Map<string, ZoneSummary> {
     const z = get(n.zoneId);
     if (z) z.maxNoise = maxDefined(z.maxNoise, n.laeq);
   }
+  for (const s of state.services ?? []) {
+    const z = get(s.zoneId);
+    if (!z) continue;
+    if (isSchool(s)) z.schools++;
+    else if (isHealthCentre(s)) z.healthCentres++;
+    else if (s.category === 'social') z.socialCentres++;
+  }
   for (const z of out.values()) {
     z.congestionRatio = z.segments ? (z.congested + z.closed) / z.segments : 0;
   }
@@ -114,7 +151,7 @@ export const RULES: Rule[] = [
     id: 'R1',
     name: 'Incidente + atasco (+ lluvia)',
     description: 'Un incidente en un distrito con tráfico denso o congestionado. Si además llueve, la alerta pasa a crítica y se recomienda cambiar coche por metro.',
-    evaluate({ zones, rain, interruptedLines }) {
+    evaluate({ state, zones, rain, interruptedLines }) {
       const out: RuleOutput[] = [];
       for (const z of zones.values()) {
         if (!z.incidents || !isJammed(z)) continue;
@@ -123,12 +160,14 @@ export const RULES: Rule[] = [
         const station = nearestMetroStation(at, interruptedLines);
         const sources: SourceId[] = ['iot', 'traffic', 'metro'];
         if (raining) sources.push('weather');
+        const hospital = nearestHospital(state.services ?? [], at);
+        if (hospital) sources.push('services');
         out.push({
           ruleId: 'R1',
           severity: raining ? 'critical' : 'warning',
           zoneId: z.zoneId,
           title: raining ? `Choque + atasco + lluvia en ${zoneName(z.zoneId)}` : `Incidente con atasco en ${zoneName(z.zoneId)}`,
-          description: `${z.incidents} incidente(s) y ${Math.round(z.congestionRatio * 100)}% de tramos densos o congestionados${raining ? ` con ${rain.toFixed(1)} mm/h de lluvia` : ''}.`,
+          description: `${z.incidents} incidente(s) y ${Math.round(z.congestionRatio * 100)}% de tramos densos o congestionados${raining ? ` con ${rain.toFixed(1)} mm/h de lluvia` : ''}.${hospital ? ` Hospital más cercano: ${hospital.service.name} (${hospital.km.toFixed(1).replace('.', ',')} km); avisar para que las ambulancias eviten la zona.` : ''}`,
           sources,
           lngLat: at,
           recommendation: station
@@ -160,8 +199,8 @@ export const RULES: Rule[] = [
           severity,
           zoneId: z.zoneId,
           title: `Episodio de contaminación por tráfico en ${zoneName(z.zoneId)}`,
-          description: `NO2 ${Math.round(no2)} µg/m³, PM10 ${Math.round(pm10)} µg/m³ con ${Math.round(z.congestionRatio * 100)}% de la red congestionada.`,
-          sources: ['air', 'traffic'],
+          description: `NO2 ${Math.round(no2)} µg/m³, PM10 ${Math.round(pm10)} µg/m³ con ${Math.round(z.congestionRatio * 100)}% de la red congestionada.${facilitiesText(z)}`,
+          sources: z.schools + z.healthCentres + z.socialCentres ? ['air', 'traffic', 'services'] : ['air', 'traffic'],
           lngLat: ZONE_BY_ID[z.zoneId].center,
           recommendation: { text: 'Activar protocolo de restricción de tráfico, reforzar EMT/metro y promocionar Valenbisi en la zona.' },
         });
@@ -173,19 +212,30 @@ export const RULES: Rule[] = [
     id: 'R3',
     name: 'Riesgo por lluvia intensa (DANA)',
     description: 'Lluvia fuerte en distritos bajos o próximos al mar. Si alguna línea de metro está interrumpida, se escala a crítica.',
-    evaluate({ rain, interruptedLines }) {
+    evaluate({ zones, rain, interruptedLines }) {
       if (rain < THRESHOLDS.heavyRain) return [];
       const torrential = rain >= THRESHOLDS.torrentialRain || interruptedLines.size > 0;
-      return ZONES.filter((z) => z.floodProne).map((z) => ({
-        ruleId: 'R3',
-        severity: torrential ? 'critical' : 'warning',
-        zoneId: z.id,
-        title: `Riesgo de inundación en ${z.name}`,
-        description: `Precipitación de ${rain.toFixed(1)} mm/h${interruptedLines.size ? ` y líneas de metro interrumpidas (${[...interruptedLines].join(', ')})` : ''}.`,
-        sources: interruptedLines.size ? ['weather', 'metro'] : ['weather'],
-        lngLat: z.center,
-        recommendation: { text: 'Evitar pasos inferiores y bajos, revisar imbornales y avisar a la población de la zona.' },
-      }));
+      return ZONES.filter((z) => z.floodProne).map((z) => {
+        const summary = zones.get(z.id)!;
+        const facilities = facilitiesText(summary);
+        const sources: SourceId[] = ['weather'];
+        if (interruptedLines.size) sources.push('metro');
+        if (facilities) sources.push('services');
+        return {
+          ruleId: 'R3',
+          severity: torrential ? 'critical' : 'warning',
+          zoneId: z.id,
+          title: `Riesgo de inundación en ${z.name}`,
+          description: `Precipitación de ${rain.toFixed(1)} mm/h${interruptedLines.size ? ` y líneas de metro interrumpidas (${[...interruptedLines].join(', ')})` : ''}.${facilities}`,
+          sources,
+          lngLat: z.center,
+          recommendation: {
+            text: facilities
+              ? 'Evitar pasos inferiores y bajos, revisar imbornales y avisar a colegios, centros sanitarios y residencias del distrito.'
+              : 'Evitar pasos inferiores y bajos, revisar imbornales y avisar a la población de la zona.',
+          },
+        };
+      });
     },
   },
   {

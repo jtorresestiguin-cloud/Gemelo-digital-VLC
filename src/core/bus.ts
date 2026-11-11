@@ -1,5 +1,5 @@
 import type {
-  AirStation, BikeStation, Incident, MetroLine, NoiseSensor, PortState, Protocol, SourceId,
+  AirStation, BikeStation, Incident, MetroLine, NoiseSensor, PortState, Protocol, PublicService, SourceId,
   TrafficSegment, Weather,
 } from './types';
 
@@ -12,7 +12,8 @@ export type BusPayload =
   | { topic: 'incident'; data: Incident; closed?: boolean }
   | { topic: 'noise'; data: NoiseSensor[] }
   | { topic: 'metro'; data: MetroLine[] }
-  | { topic: 'port'; data: PortState };
+  | { topic: 'port'; data: PortState }
+  | { topic: 'services'; data: PublicService[] };
 
 export type BusTopic = BusPayload['topic'];
 
