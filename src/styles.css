@@ -116,6 +116,7 @@ h1, h3, h4, p { margin: 0; }
 .toast {
   position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); bottom: 24px;
   padding: 8px 14px; border-radius: 8px; background: var(--panel-solid); border: 1px solid var(--line); font-size: 13px;
+  max-width: calc(100% - 32px);
 }
 .toast.danger { background: var(--bad); border: 0; bottom: 64px; }
 

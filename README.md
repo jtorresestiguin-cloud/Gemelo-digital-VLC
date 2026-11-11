@@ -93,7 +93,10 @@ npm run build    # genera dist/ (estático)
 ## Despliegue
 
 `dist/` es un sitio estático. El workflow `.github/workflows/deploy.yml` lo publica en
-**GitHub Pages** al hacer push a `main` (activar en *Settings → Pages → Source: GitHub Actions*).
+**GitHub Pages** en cada push a la rama por defecto del repositorio (activar una vez en
+*Settings → Pages → Source: GitHub Actions*). Queda en
+`https://<usuario>.github.io/<repositorio>/` y se puede abrir desde el móvil e instalar en
+la pantalla de inicio («Añadir a pantalla de inicio»).
 También funciona tal cual en Cloudflare Pages, Netlify o Vercel (comando `npm run build`,
 directorio `dist`).
 

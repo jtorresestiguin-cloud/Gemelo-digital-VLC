@@ -1,8 +1,8 @@
 name: Desplegar en GitHub Pages
 
+# Se compila y prueba en cualquier rama; solo se publica desde la rama por defecto del repositorio.
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -31,6 +31,7 @@ jobs:
           path: dist
   deploy:
     needs: build
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     environment:
       name: github-pages

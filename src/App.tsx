@@ -28,6 +28,7 @@ export default function App() {
   const [focus, setFocus] = useState<{ lngLat: LngLat; seq: number; zoom?: number }>();
   const [baseMapOnline, setBaseMapOnline] = useState<boolean>();
   const [collapsed, setCollapsed] = useState(false);
+  const [showBaseMapToast, setShowBaseMapToast] = useState(true);
   const [map, setMap] = useState<MlMap>();
   const [serviceCats, setServiceCats] = useState<ServiceCategory[]>(SERVICE_CATEGORIES.map((c) => c.id));
   const [bimModel, setBimModel] = useState<BimModel>();
@@ -37,6 +38,12 @@ export default function App() {
     () => (bimModel ? { geometry: bimModel.geometry, placement: { anchor: bimAnchor, rotationDeg: bimRotation }, seq: 0 } : undefined),
     [bimModel, bimAnchor, bimRotation],
   );
+
+  useEffect(() => {
+    if (baseMapOnline !== false) return;
+    const t = setTimeout(() => setShowBaseMapToast(false), 6000);
+    return () => clearTimeout(t);
+  }, [baseMapOnline]);
 
   useEffect(() => {
     runtime.start();
@@ -79,8 +86,12 @@ export default function App() {
         serviceCategories={serviceCats}
       />
 
-      {baseMapOnline === false && <div className="toast">Cartografía base no disponible: se muestran solo las capas de datos.</div>}
-      {critical > 0 && collapsed && <div className="toast danger">{critical} alerta(s) crítica(s)</div>}
+      {baseMapOnline === false && showBaseMapToast && (
+        <button className="toast" onClick={() => setShowBaseMapToast(false)}>Cartografía base no disponible: se muestran solo las capas de datos. ✕</button>
+      )}
+      {critical > 0 && collapsed && (
+        <button className="toast danger" onClick={() => { setTab('alerts'); setCollapsed(false); }}>{critical} alerta(s) crítica(s) · ver</button>
+      )}
 
       <aside className={`panel ${collapsed ? 'collapsed' : ''}`}>
         <div className="panel-handle" onClick={() => setCollapsed((c) => !c)} role="button" aria-label="Mostrar u ocultar panel">
