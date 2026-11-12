@@ -177,10 +177,11 @@ function popupHtml(p: Record<string, unknown>): string {
       const pairs: [string, unknown][] = [['Tipo', p.type], ['Categoría', cat?.label]];
       if (p.emergency) pairs.push(['Urgencias', 'Sí']);
       if (p.address) pairs.push(['Dirección', p.address]);
+      if (p.detail) pairs.push(['Detalle', p.detail]);
       if (p.hours) pairs.push(['Horario', p.hours]);
       if (p.phone) pairs.push(['Teléfono', p.phone]);
       const web = typeof p.website === 'string' && /^https?:\/\//.test(p.website) ? `<p><a href="${esc(p.website)}" target="_blank" rel="noopener">Web</a></p>` : '';
-      return `${title}<table>${rows(pairs)}</table>${web}<p class="src">Fuente: OpenStreetMap</p>`;
+      return `${title}<table>${rows(pairs)}</table>${web}<p class="src">Fuente: Ajuntament de València</p>`;
     }
     case 'district': return `${title}<table>${rows([['Alertas activas', p.alerts]])}</table>`;
     case 'traffic': return `${title}<table>${rows([['Estado', p.label]])}</table>`;

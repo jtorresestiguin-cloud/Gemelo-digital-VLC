@@ -35,7 +35,7 @@ export class CityRuntime {
     };
 
     this.poll('traffic', 3 * MIN, async () => this.bus.publish({ source: 'traffic', protocol: 'REST', topic: 'traffic', data: await fetchTraffic(), live: true, ts: Date.now() }));
-    this.poll('bikes', 2 * MIN, async () => this.bus.publish({ source: 'bikes', protocol: 'REST', topic: 'bikes', data: await fetchBikes(), live: true, ts: Date.now() }));
+    this.poll('bikes', 3 * MIN, async () => this.bus.publish({ source: 'bikes', protocol: 'REST', topic: 'bikes', data: await fetchBikes(), live: true, ts: Date.now() }));
     this.poll('air', 10 * MIN, async () => this.bus.publish({ source: 'air', protocol: 'REST', topic: 'air', data: await fetchAir(), live: true, ts: Date.now() }));
     this.startServices();
     this.poll('weather', 10 * MIN, async () => this.bus.publish({ source: 'weather', protocol: 'REST', topic: 'weather', data: await fetchWeather(), live: true, ts: Date.now() }));

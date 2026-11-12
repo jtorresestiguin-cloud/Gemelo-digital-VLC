@@ -1,19 +1,13 @@
 /**
  * Fuentes públicas reales:
- *  - Portal de datos abiertos del Ajuntament de València (Opendatasoft, API Explore v2.1)
+ *  - Geoportal del Ajuntament de València (capas OPENDATA, las mismas que publica
+ *    opendata.vlci.valencia.es)
  *  - Open-Meteo (meteorología actual, sin clave)
  */
 import { midpoint, zoneFor } from '../core/geo';
 import type { AirStation, BikeStation, LngLat, TrafficSegment, TrafficState, Weather } from '../core/types';
 import { VALENCIA_CENTER } from '../data/static';
-
-const ODS = 'https://valencia.opendatasoft.com/api/explore/v2.1/catalog/datasets';
-
-export const DATASETS = {
-  traffic: 'estat-transit-temps-real-estado-trafico-tiempo-real',
-  bikes: 'valenbisi-disponibilitat-valenbisi-dsiponibilidad',
-  air: 'estacions-contaminacio-atmosferiques-estaciones-contaminacion-atmosfericas',
-} as const;
+import { LAYERS, fetchLayer } from './geoportal';
 
 type Props = Record<string, unknown>;
 interface Feature { geometry: { type: string; coordinates: unknown } | null; properties: Props }
@@ -31,7 +25,6 @@ async function fetchJson<T>(url: string, timeoutMs = 12_000): Promise<T> {
   }
 }
 
-const fetchDataset = (id: string) => fetchJson<FeatureCollection>(`${ODS}/${id}/exports/geojson`);
 
 const num = (...vals: unknown[]): number | undefined => {
   for (const v of vals) {
@@ -113,15 +106,15 @@ export function parseAir(fc: FeatureCollection): AirStation[] {
       pm10: num(p.pm10),
       pm25: num(p.pm25, p['pm2_5']),
       o3: num(p.o3),
-      quality: str(p.calidad_ambiental),
+      quality: str(p.calidad_ambiental, p.calidad_am),
     });
   });
   return out;
 }
 
-export const fetchTraffic = async () => parseTraffic(await fetchDataset(DATASETS.traffic));
-export const fetchBikes = async () => parseBikes(await fetchDataset(DATASETS.bikes));
-export const fetchAir = async () => parseAir(await fetchDataset(DATASETS.air));
+export const fetchTraffic = async () => parseTraffic(await fetchLayer(LAYERS.traffic));
+export const fetchBikes = async () => parseBikes(await fetchLayer(LAYERS.bikes));
+export const fetchAir = async () => parseAir(await fetchLayer(LAYERS.air));
 
 export async function fetchWeather(): Promise<Weather> {
   const [lng, lat] = VALENCIA_CENTER;

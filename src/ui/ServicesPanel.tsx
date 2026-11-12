@@ -37,7 +37,7 @@ export function ServicesPanel({ services, status, enabled, onChange, onFocus }: 
     <div className="services">
       <h4>Servicios públicos {services.length > 0 && <span className="muted">({services.length.toLocaleString('es-ES')})</span>}</h4>
       {!services.length && (
-        <p className="muted small">{status?.mode === 'error' ? status.detail : 'Descargando equipamientos de OpenStreetMap…'}</p>
+        <p className="muted small">{status?.mode === 'error' ? status.detail : 'Descargando equipamientos municipales…'}</p>
       )}
       <div className="cat-list">
         {SERVICE_CATEGORIES.map((c) => (

@@ -7,6 +7,7 @@ import { Delaunay } from 'd3-delaunay';
 import type { LngLat } from '../core/types';
 import type { Polygons } from '../core/geo';
 import { VALENCIA_BOUNDS, ZONES } from '../data/static';
+import { LAYERS, fetchLayer } from './geoportal';
 
 export interface District {
   zoneId: string;
@@ -14,8 +15,6 @@ export interface District {
   polygons: Polygons;
 }
 
-export const DISTRICTS_DATASET = 'districtes-distritos';
-const URL = `https://valencia.opendatasoft.com/api/explore/v2.1/catalog/datasets/${DISTRICTS_DATASET}/exports/geojson`;
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
 
@@ -24,7 +23,7 @@ interface Feature { geometry: { type: string; coordinates: unknown } | null; pro
 export function parseDistricts(fc: { features: Feature[] }): District[] {
   const byCode = new Map(ZONES.map((z) => [z.code, z]));
   const byName = new Map(ZONES.map((z) => [norm(z.name), z]));
-  const out: District[] = [];
+  const byZone = new Map<string, District>();
   for (const f of fc.features) {
     if (!f.geometry) continue;
     const p = f.properties ?? {};
@@ -36,8 +35,12 @@ export function parseDistricts(fc: { features: Feature[] }): District[] {
       f.geometry.type === 'Polygon' ? [f.geometry.coordinates as LngLat[][]]
       : f.geometry.type === 'MultiPolygon' ? (f.geometry.coordinates as LngLat[][][])
       : [];
-    if (polygons.length) out.push({ zoneId: zone.id, name: zone.name, polygons });
+    if (!polygons.length) continue;
+    // un distrito puede venir en varias entidades: se unen sus polígonos
+    const prev = byZone.get(zone.id);
+    byZone.set(zone.id, { zoneId: zone.id, name: zone.name, polygons: [...(prev?.polygons ?? []), ...polygons] });
   }
+  const out = [...byZone.values()];
   if (out.length < ZONES.length / 2) throw new Error(`solo se reconocieron ${out.length} distritos`);
   return out;
 }
@@ -53,13 +56,5 @@ export function approximateDistricts(): District[] {
 }
 
 export async function fetchDistricts(): Promise<District[]> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 12_000);
-  try {
-    const r = await fetch(URL, { signal: ctrl.signal });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return parseDistricts(await r.json());
-  } finally {
-    clearTimeout(t);
-  }
+  return parseDistricts(await fetchLayer(LAYERS.districts));
 }

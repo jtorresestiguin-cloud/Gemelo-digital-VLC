@@ -113,6 +113,10 @@ export interface PublicService {
   openingHours?: string;
   /** hospital con urgencias */
   emergency?: boolean;
+  /** centro de financiación pública */
+  publicFunded?: boolean;
+  /** información adicional para la ficha */
+  detail?: string;
 }
 
 export interface CityState {

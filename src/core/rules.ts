@@ -46,13 +46,14 @@ export interface ZoneSummary {
   socialCentres: number;
 }
 
-const isSchool = (s: PublicService) => s.category === 'education' && /Colegio|Escuela infantil/.test(s.kind);
-const isHealthCentre = (s: PublicService) => s.category === 'health' && s.kind !== 'Farmacia' && s.kind !== 'Consulta médica';
+const isSchool = (s: PublicService) => s.category === 'education' && !/universi|adultos/i.test(`${s.kind} ${s.name}`);
+const isHealthCentre = (s: PublicService) => s.category === 'health' && !/farmacia|consulta/i.test(s.kind);
 
-/** Hospital más cercano (preferentemente con urgencias). */
+/** Hospital más cercano (preferentemente con urgencias; si no se sabe, de financiación pública). */
 export function nearestHospital(services: PublicService[], p: LngLat): { service: PublicService; km: number } | undefined {
   const hospitals = services.filter((s) => s.kind === 'Hospital');
-  const pool = hospitals.some((h) => h.emergency) ? hospitals.filter((h) => h.emergency) : hospitals;
+  const pool = hospitals.some((h) => h.emergency) ? hospitals.filter((h) => h.emergency)
+    : hospitals.some((h) => h.publicFunded) ? hospitals.filter((h) => h.publicFunded) : hospitals;
   let best: { service: PublicService; km: number } | undefined;
   for (const h of pool) {
     const km = distanceKm(p, h.lngLat);

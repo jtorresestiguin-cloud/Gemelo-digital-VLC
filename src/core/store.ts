@@ -23,14 +23,14 @@ export interface Snapshot {
 }
 
 const INITIAL_SOURCES: SourceStatus[] = [
-  { id: 'traffic', name: 'Tráfico en tiempo real', provider: 'Ajuntament de València', protocol: 'REST', mode: 'connecting', messages: 0 },
-  { id: 'bikes', name: 'Valenbisi', provider: 'Ajuntament de València', protocol: 'REST', mode: 'connecting', messages: 0 },
-  { id: 'air', name: 'Calidad del aire', provider: 'Red de vigilancia atmosférica', protocol: 'REST', mode: 'connecting', messages: 0 },
+  { id: 'traffic', name: 'Tráfico en tiempo real', provider: 'Geoportal Ajuntament de València', protocol: 'REST', mode: 'connecting', messages: 0 },
+  { id: 'bikes', name: 'Valenbisi', provider: 'Geoportal Ajuntament de València', protocol: 'REST', mode: 'connecting', messages: 0 },
+  { id: 'air', name: 'Calidad del aire', provider: 'Geoportal · red de vigilancia atmosférica', protocol: 'REST', mode: 'connecting', messages: 0 },
   { id: 'weather', name: 'Meteorología', provider: 'Open-Meteo', protocol: 'REST', mode: 'connecting', messages: 0 },
   { id: 'iot', name: 'Sensores IoT (ruido, incidencias)', provider: 'Broker MQTT', protocol: 'MQTT', mode: 'connecting', messages: 0 },
   { id: 'metro', name: 'Metrovalencia', provider: 'Feed GTFS-Realtime', protocol: 'GTFS-RT', mode: 'connecting', messages: 0 },
   { id: 'port', name: 'Port de València (PLCs)', provider: 'Servidor OPC UA', protocol: 'OPC-UA', mode: 'connecting', messages: 0 },
-  { id: 'services', name: 'Servicios públicos', provider: 'OpenStreetMap (API Overpass)', protocol: 'REST', mode: 'connecting', messages: 0 },
+  { id: 'services', name: 'Servicios públicos', provider: 'Ajuntament de València (Geoportal y datos abiertos)', protocol: 'REST', mode: 'connecting', messages: 0 },
 ];
 
 const DEFAULT_WEATHER: Weather = { temperature: 20, precipitation: 0, windSpeed: 8, weatherCode: 0 };

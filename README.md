@@ -11,14 +11,14 @@ la ciudad en 3D.
 
   | Fuente | Protocolo | Origen |
   |---|---|---|
-  | Tráfico en tiempo real | REST (Opendatasoft) | **Real**: Ajuntament de València |
-  | Valenbisi | REST | **Real**: Ajuntament de València |
-  | Calidad del aire | REST | **Real**: red de vigilancia atmosférica |
+  | Tráfico en tiempo real | REST (ArcGIS) | **Real**: Geoportal del Ajuntament de València |
+  | Valenbisi | REST (ArcGIS) | **Real**: Geoportal del Ajuntament de València |
+  | Calidad del aire | REST (ArcGIS) | **Real**: Geoportal (red de vigilancia atmosférica) |
   | Meteorología | REST | **Real**: Open-Meteo |
   | Sensores IoT (ruido, incidencias) | MQTT | Simulado |
   | Metrovalencia | GTFS-Realtime | Simulado |
   | Port de València (PLCs) | OPC UA | Simulado |
-  | Servicios públicos | REST (API Overpass) | **Real**: OpenStreetMap |
+  | Servicios públicos | REST (ArcGIS + CKAN) | **Real**: equipamientos municipales (Geoportal) y hospitales (opendata.vlci.valencia.es) |
 
   Frecuencia de actualización por API: tráfico cada 3 min, Valenbisi cada 2 min, calidad del
   aire y meteorología cada 10 min, servicios públicos cada 24 h (con copia local en el navegador).
@@ -41,10 +41,9 @@ la ciudad en 3D.
 - **La ciudad en 3D**: edificios de OpenStreetMap con su altura real (vía OpenFreeMap, sin
   clave), puntos de interés (Ciutat de les Arts i les Ciències, Micalet, Mercat Central…),
   **ortofoto PNOA** del IGN y **relieve 3D** (Terrain Tiles de AWS Open Data) activables.
-- **Todos los servicios públicos de la ciudad** (≈ miles de equipamientos de OpenStreetMap
-  dentro del término municipal), en 8 categorías: sanidad (hospitales, centros de salud,
-  farmacias…), educación, cultura, deporte, servicios sociales, mercados, administración y
-  emergencias (policía, bomberos, ambulancias). Filtro por categoría, buscador y ficha con
+- **Todos los servicios públicos de la ciudad**: los equipamientos municipales oficiales del
+  Geoportal más los hospitales del portal de datos abiertos, en 8 categorías: sanidad,
+  educación, cultura, deporte, servicios sociales, mercados, administración y emergencias. Filtro por categoría, buscador y ficha con
   dirección, horario, teléfono y web. El motor de reglas los usa: R1 indica el hospital más
   cercano al incidente, y R2/R3 enumeran los colegios, centros sanitarios y residencias
   afectados del distrito.
@@ -80,6 +79,14 @@ Los simuladores (`src/sim/simulator.ts`) emiten exactamente el formato de cada p
 (`src/sim/protocols.ts`), y los decodificadores (`src/adapters/decoders.ts`) son los mismos que
 usaría un driver real: para conectar un broker MQTT, un feed GTFS-RT o un Context Broker
 FIWARE solo hay que cambiar el transporte.
+
+## Fuentes y comprobación
+
+Los datos municipales se leen del **Geoportal del Ajuntament** (`geoportal.valencia.es`,
+capas `OPENDATA`), que es de donde se alimenta el portal de datos abiertos
+`opendata.vlci.valencia.es` y admite peticiones desde el navegador. El workflow
+**Comprobar APIs** (`.github/workflows/check-apis.yml`, manual y semanal) ejecuta los
+adaptadores de la app contra las APIs reales y falla si alguna deja de responder.
 
 ## Uso
 

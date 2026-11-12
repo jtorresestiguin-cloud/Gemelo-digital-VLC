@@ -1,10 +1,12 @@
 /**
- * Servicios públicos de la ciudad desde OpenStreetMap (API Overpass, sin clave).
- * Se consulta el término municipal de València (relación OSM con wikidata Q8818),
- * con caché local de 24 h para no saturar el servicio.
+ * Servicios públicos de la ciudad desde fuentes oficiales del Ajuntament de València:
+ *  - Equipamientos municipales (Geoportal, capa OPENDATA/SociedadBienestar/1): ~3.000 registros
+ *  - Hospitales (portal de datos abiertos opendata.vlci.valencia.es)
+ * Se guardan 24 h en el navegador para no repetir la descarga en cada visita.
  */
 import { zoneFor } from '../core/geo';
 import type { LngLat, PublicService, ServiceCategory } from '../core/types';
+import { LAYERS, fetchLayer, type GeoCollection } from './geoportal';
 
 export const SERVICE_CATEGORIES: { id: ServiceCategory; label: string; color: string }[] = [
   { id: 'health', label: 'Sanidad', color: '#2a78d6' },
@@ -17,112 +19,88 @@ export const SERVICE_CATEGORIES: { id: ServiceCategory; label: string; color: st
   { id: 'emergency', label: 'Emergencias y seguridad', color: '#e34948' },
 ];
 
-/** tipo OSM → [categoría, etiqueta en castellano] */
-const KINDS: Record<string, [ServiceCategory, string]> = {
-  'amenity=hospital': ['health', 'Hospital'],
-  'amenity=clinic': ['health', 'Centro de salud / clínica'],
-  'healthcare=centre': ['health', 'Centro de salud'],
-  'amenity=doctors': ['health', 'Consulta médica'],
-  'amenity=pharmacy': ['health', 'Farmacia'],
-  'amenity=kindergarten': ['education', 'Escuela infantil'],
-  'amenity=school': ['education', 'Colegio / instituto'],
-  'amenity=college': ['education', 'Formación profesional'],
-  'amenity=university': ['education', 'Universidad'],
-  'amenity=library': ['culture', 'Biblioteca'],
-  'tourism=museum': ['culture', 'Museo'],
-  'amenity=theatre': ['culture', 'Teatro'],
-  'amenity=arts_centre': ['culture', 'Centro cultural'],
-  'amenity=community_centre': ['culture', 'Centro cívico / casal'],
-  'leisure=sports_centre': ['sport', 'Polideportivo'],
-  'amenity=social_facility': ['social', 'Servicio social / residencia'],
-  'amenity=marketplace': ['market', 'Mercado municipal'],
-  'amenity=townhall': ['administration', 'Ayuntamiento / junta de distrito'],
-  'office=government': ['administration', 'Oficina de la administración'],
-  'amenity=courthouse': ['administration', 'Juzgado'],
-  'amenity=post_office': ['administration', 'Oficina de Correos'],
-  'amenity=police': ['emergency', 'Policía'],
-  'amenity=fire_station': ['emergency', 'Bomberos'],
-  'emergency=ambulance_station': ['emergency', 'Base de ambulancias'],
+export const HOSPITALS_URL =
+  'https://opendata.vlci.valencia.es/dataset/c389b148-0fad-46b2-8c7b-f5c5aa866a65/resource/82588e44-2ba8-4038-9bc9-5fb1ce2428d2/download/hospitales.geojson';
+
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** Clases del Geoportal que no son servicios a la ciudadanía. */
+const IGNORED = /venta emt|sin clase|invisible/;
+
+/** "clase" del Geoportal → categoría de la app. */
+const CLASS_RULES: [RegExp, ServiceCategory][] = [
+  [/sanitar|salud|hospital|ambulatori/, 'health'],
+  [/educa|escuel|colegio|guarder|infantil/, 'education'],
+  [/museo|bibliotec|teatro|archivo|cultur|auditor/, 'culture'],
+  [/deport|polidep|piscina/, 'sport'],
+  [/bienestar|social|juvenil|mayores|alojamiento|albergue|igualdad|mujer/, 'social'],
+  [/mercad/, 'market'],
+  [/polic|bomber|proteccion civil|emergenc|seguridad/, 'emergency'],
+  [/oficina|municipal|junta|ayuntamiento|registro|administra/, 'administration'],
+];
+
+export function classifyClass(clase: string): ServiceCategory | undefined {
+  const c = norm(clase);
+  if (!c || IGNORED.test(c)) return undefined;
+  return CLASS_RULES.find(([re]) => re.test(c))?.[1];
+}
+
+const titleCase = (s: string) =>
+  s.toLowerCase().replace(/(^|[\s(/-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+
+const pointOf = (g: GeoCollection['features'][number]['geometry']): LngLat | undefined => {
+  if (!g) return undefined;
+  if (g.type === 'Point') return g.coordinates as LngLat;
+  if (g.type === 'MultiPoint') return (g.coordinates as LngLat[])[0];
+  return undefined;
 };
 
-/** Prioridad cuando un elemento tiene varias etiquetas (p. ej. hospital con farmacia). */
-const PRIORITY = Object.keys(KINDS);
-
-export function buildOverpassQuery(): string {
-  const byKey = new Map<string, string[]>();
-  for (const k of PRIORITY) {
-    const [key, value] = k.split('=');
-    byKey.set(key, [...(byKey.get(key) ?? []), value]);
-  }
-  const clauses = [...byKey].map(([key, values]) => {
-    const extra = key === 'leisure' ? '["access"!~"private|customers|members"]' : '';
-    return `  nwr["${key}"~"^(${values.join('|')})$"]${extra}(area.vlc);`;
-  });
-  return [
-    '[out:json][timeout:90];',
-    'area["wikidata"="Q8818"]["boundary"="administrative"]->.vlc;',
-    '(',
-    ...clauses,
-    ');',
-    'out center tags qt;',
-  ].join('\n');
-}
-
-interface OverpassElement {
-  type: 'node' | 'way' | 'relation';
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: Record<string, string>;
-}
-
-export function classify(tags: Record<string, string>): [ServiceCategory, string] | undefined {
-  for (const k of PRIORITY) {
-    const [key, value] = k.split('=');
-    if (tags[key] === value) return KINDS[k];
-  }
-  return undefined;
-}
-
-export function parseOverpass(json: { elements: OverpassElement[] }): PublicService[] {
+export function parseFacilities(fc: GeoCollection): PublicService[] {
   const out: PublicService[] = [];
-  const seen = new Set<string>();
-  for (const e of json.elements ?? []) {
-    const lat = e.lat ?? e.center?.lat;
-    const lon = e.lon ?? e.center?.lon;
-    const tags = e.tags ?? {};
-    const cls = classify(tags);
-    if (lat === undefined || lon === undefined || !cls) continue;
-    const id = `${e.type[0]}${e.id}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const lngLat: LngLat = [lon, lat];
-    const street = tags['addr:street'];
+  for (const f of fc.features) {
+    const p = f.properties ?? {};
+    const lngLat = pointOf(f.geometry);
+    const clase = String(p.clase ?? '');
+    const category = classifyClass(clase);
+    if (!lngLat || !category) continue;
+    const phone = p.telefono ? String(p.telefono) : undefined;
     out.push({
-      id,
-      name: tags.name ?? tags['name:es'] ?? tags['name:ca'] ?? cls[1],
-      category: cls[0],
-      kind: cls[1],
+      id: `eq-${p.objectid ?? p.identifica ?? out.length}`,
+      name: titleCase(String(p.equipamien ?? clase)),
+      category,
+      kind: clase,
       lngLat,
       zoneId: zoneFor(lngLat),
-      address: street ? `${street}${tags['addr:housenumber'] ? ', ' + tags['addr:housenumber'] : ''}` : undefined,
-      phone: tags.phone ?? tags['contact:phone'],
-      website: tags.website ?? tags['contact:website'],
-      openingHours: tags.opening_hours,
-      emergency: tags.emergency === 'yes' || undefined,
+      phone: phone && phone.length >= 9 ? phone : undefined,
     });
   }
   return out;
 }
 
-const ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-];
+export function parseHospitals(fc: GeoCollection): PublicService[] {
+  const out: PublicService[] = [];
+  fc.features.forEach((f, i) => {
+    const p = f.properties ?? {};
+    const g = p.geo_point_2d as { lon?: number; lat?: number } | undefined;
+    const lngLat = pointOf(f.geometry) ?? (g?.lon !== undefined && g?.lat !== undefined ? [g.lon, g.lat] as LngLat : undefined);
+    if (!lngLat) return;
+    const financing = String(p.financiaci ?? '');
+    out.push({
+      id: `h-${i}`,
+      name: String(p.nombre ?? 'Hospital'),
+      category: 'health',
+      kind: 'Hospital',
+      lngLat,
+      zoneId: zoneFor(lngLat),
+      address: p.direccion ? String(p.direccion) : undefined,
+      publicFunded: /p[uú]blic/i.test(financing) || undefined,
+      detail: [financing && `Financiación: ${financing.toLowerCase()}`, p.camas && `${p.camas} camas`].filter(Boolean).join(' · ') || undefined,
+    });
+  });
+  return out;
+}
 
-const CACHE_KEY = 'vlc-twin-services-v1';
+const CACHE_KEY = 'vlc-twin-services-v2';
 export const SERVICES_TTL = 24 * 3600_000;
 
 export function readServicesCache(): { t: number; data: PublicService[] } | undefined {
@@ -142,25 +120,32 @@ function writeServicesCache(data: PublicService[]) {
   }
 }
 
-/** Descarga los servicios probando varios servidores Overpass. */
-export async function fetchServices(): Promise<PublicService[]> {
-  const body = new URLSearchParams({ data: buildOverpassQuery() });
-  let lastError: unknown;
-  for (const url of ENDPOINTS) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 100_000);
-    try {
-      const r = await fetch(url, { method: 'POST', body, signal: ctrl.signal });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const services = parseOverpass(await r.json());
-      if (!services.length) throw new Error('respuesta vacía');
-      writeServicesCache(services);
-      return services;
-    } catch (e) {
-      lastError = e;
-    } finally {
-      clearTimeout(t);
-    }
+async function fetchHospitals(): Promise<PublicService[]> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20_000);
+  try {
+    const r = await fetch(HOSPITALS_URL, { signal: ctrl.signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return parseHospitals(await r.json());
+  } finally {
+    clearTimeout(t);
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+/** Descarga equipamientos y hospitales. Basta con que responda una de las dos fuentes. */
+export async function fetchServices(): Promise<PublicService[]> {
+  const [facilities, hospitals] = await Promise.allSettled([
+    fetchLayer(LAYERS.facilities, { timeoutMs: 30_000 }).then(parseFacilities),
+    fetchHospitals(),
+  ]);
+  const data = [
+    ...(facilities.status === 'fulfilled' ? facilities.value : []),
+    ...(hospitals.status === 'fulfilled' ? hospitals.value : []),
+  ];
+  if (!data.length) {
+    const reason = [facilities, hospitals].map((r) => (r.status === 'rejected' ? String((r.reason as Error)?.message ?? r.reason) : 'vacío')).join(' / ');
+    throw new Error(reason);
+  }
+  writeServicesCache(data);
+  return data;
 }

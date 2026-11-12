@@ -116,6 +116,6 @@ export const servicesGeo = (s: CityState) =>
     properties: {
       kind: 'service', name: x.name, category: x.category, type: x.kind,
       hospital: x.kind === 'Hospital', address: x.address ?? '', phone: x.phone ?? '', website: x.website ?? '',
-      hours: x.openingHours ?? '', emergency: !!x.emergency,
+      hours: x.openingHours ?? '', emergency: !!x.emergency, detail: x.detail ?? '',
     },
   })));
