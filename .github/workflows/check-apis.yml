@@ -1,0 +1,22 @@
+name: Comprobar APIs
+
+# Diagnóstico manual de las fuentes de datos reales (y semanal, para detectar cambios en las APIs).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run -c vitest.live.config.ts --reporter=verbose
