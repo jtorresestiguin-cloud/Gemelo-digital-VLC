@@ -14,6 +14,10 @@ import { PORT_ASSETS, type CameraPreset } from './data/static';
 import { MapToolbar } from './ui/MapToolbar';
 import { TransitPanel } from './ui/TransitPanel';
 import type { BusColorMode } from './map/transit';
+import { PhotorealPanel } from './ui/PhotorealPanel';
+import type { PhotorealState } from './map/google3d';
+
+const BUILD_GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || undefined;
 import type { MapTheme } from './map/theme';
 
 const readPref = <T,>(key: string, fallback: T): T => {
@@ -60,6 +64,10 @@ export default function App() {
   const [camera, setCamera] = useState<{ preset: CameraPreset; seq: number }>();
   const [recording, setRecording] = useState(false);
   const [busMode, setBusMode] = useState<BusColorMode>('movement');
+  const [googleKey, setGoogleKey] = useState<string | undefined>(() => readPref<string | undefined>('vlc-google-key', undefined));
+  const [photoreal, setPhotoreal] = useState(false);
+  const [photorealState, setPhotorealState] = useState<PhotorealState>({ state: 'off' });
+  const activeGoogleKey = BUILD_GOOGLE_KEY || googleKey;
 
   useEffect(() => writePref('vlc-theme', theme), [theme]);
 
@@ -127,7 +135,18 @@ export default function App() {
         orbit={orbit}
         camera={camera}
         busColorMode={busMode}
+        photorealKey={photoreal && activeGoogleKey ? activeGoogleKey : null}
+        onPhotoreal={(st) => {
+          setPhotorealState(st);
+          if (st.state === 'error') setPhotoreal(false);
+        }}
       />
+      {photoreal && photorealState.state === 'on' && (
+        <div className="google-attrib" aria-label="Atribución de Google">
+          <strong>Google</strong>
+          {photorealState.credits && <span>{photorealState.credits}</span>}
+        </div>
+      )}
 
       <MapToolbar
         theme={theme}
@@ -176,6 +195,21 @@ export default function App() {
                   onMode={setBusMode}
                   layers={layers}
                   onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
+                />
+                <PhotorealPanel
+                  enabled={photoreal}
+                  state={photorealState}
+                  buildKey={BUILD_GOOGLE_KEY}
+                  savedKey={googleKey}
+                  onSaveKey={(k) => {
+                    setGoogleKey(k);
+                    if (k) writePref('vlc-google-key', k);
+                    else try { localStorage.removeItem('vlc-google-key'); } catch { /* sin almacenamiento */ }
+                  }}
+                  onToggle={(on) => {
+                    setPhotoreal(on);
+                    if (on) setPhotorealState({ state: 'loading' });
+                  }}
                 />
                 <ServicesPanel
                   services={snapshot.state.services}

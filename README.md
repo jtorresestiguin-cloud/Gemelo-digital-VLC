@@ -57,6 +57,9 @@ la ciudad en 3D.
   se resalta su línea.
 - **Estética y cámara**: mapa en **modo noche** (por defecto) o día, atajos **«Ir a…»**,
   **girar alrededor** y **modo grabación** (tecla R) que deja solo el mapa para grabar vídeos.
+- **Vista fotorrealista 3D (Google)**: la ciudad con los «Photorealistic 3D Tiles» de
+  Google (fotogrametría aérea), dibujados con deck.gl dentro del mapa y con los datos del
+  gemelo encima. Requiere una clave propia (ver *Vista fotorrealista* más abajo).
 - **Los 19 distritos** con sus límites oficiales (portal de datos abiertos) coloreados según la
   peor alerta activa. Los elementos se asignan a su distrito por punto-en-polígono; si el
   servicio no responde, se usan polígonos aproximados (Voronoi de los centroides).
@@ -116,6 +119,27 @@ npm run build    # genera dist/ (estático)
 la pantalla de inicio («Añadir a pantalla de inicio»).
 También funciona tal cual en Cloudflare Pages, Netlify o Vercel (comando `npm run build`,
 directorio `dist`).
+
+## Vista fotorrealista (Google Photorealistic 3D Tiles)
+
+1. En [Google Cloud Console](https://console.cloud.google.com/) crea un proyecto y activa la
+   facturación (la Map Tiles API tiene un uso mensual gratuito; consulta los precios vigentes).
+2. *APIs y servicios → Biblioteca*: activa **Map Tiles API**.
+3. *APIs y servicios → Credenciales → Crear credenciales → Clave de API* y restríngela:
+   - **Restricción de aplicación**: sitios web, añadiendo
+     `https://jtorresestiguin-cloud.github.io/*` (y `http://localhost:5173/*` para desarrollo).
+   - **Restricción de API**: solo *Map Tiles API*.
+4. Usa la clave de una de estas dos formas:
+   - **Solo en tu navegador**: pestaña *En vivo y capas → Vista fotorrealista 3D → Guardar y activar*.
+   - **Para todos los visitantes**: en GitHub, *Settings → Secrets and variables → Actions →
+     New repository secret*, nombre `GOOGLE_MAPS_KEY`, y vuelve a ejecutar el workflow de
+     despliegue. La clave queda dentro del JavaScript publicado (es una clave de navegador),
+     por eso es imprescindible la restricción por dominio del paso 3.
+
+Condiciones de Google que respeta la app: se muestra «Google» y las atribuciones de las
+teselas visibles, y mientras la vista está activa se oculta el mapa base de OpenStreetMap
+(los modelos de Google no se pueden combinar con otros mapas base). deck.gl (~1,5 MB) solo
+se descarga al activar la vista.
 
 ## Transparencia
 

@@ -285,3 +285,17 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 .switch input:checked + i { background: #2563eb; }
 .switch input:checked + i::after { transform: translateX(13px); }
 .switch input:focus-visible + i { outline: 2px solid #93c5fd; outline-offset: 2px; }
+
+/* Vista fotorrealista (Google) */
+.photoreal { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.photoreal h4 { font-size: 13px; }
+.photoreal code { font-size: 11px; color: #cbd5e1; }
+.photoreal .file-btn:disabled { opacity: 0.45; cursor: default; }
+.google-attrib {
+  position: absolute; z-index: 4; left: 12px; bottom: 58px; max-width: min(640px, calc(100% - 430px));
+  display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.85); color: #3c4043; font-size: 11px;
+}
+.google-attrib strong { font-family: 'Product Sans', Arial, sans-serif; font-size: 13px; color: #5f6368; }
+.app.recording .google-attrib { display: flex; bottom: 12px; }
+@media (max-width: 760px) { .google-attrib { max-width: calc(100% - 24px); bottom: calc(46vh + 56px); } }

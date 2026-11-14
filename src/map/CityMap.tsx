@@ -11,6 +11,7 @@ import {
   addTransitLayers, busesFrame, highlightLine, routesGeo, setBusColorMode, stopsGeo, themeTransit, type BusColorMode,
 } from './transit';
 import type { BusTrack } from '../core/types';
+import { enablePhotoreal, type PhotorealState } from './google3d';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import {
@@ -229,12 +230,15 @@ interface Props {
   serviceCategories: ServiceCategory[];
   theme: MapTheme;
   busColorMode: BusColorMode;
+  /** clave de Google para la vista fotorrealista; null = desactivada */
+  photorealKey: string | null;
+  onPhotoreal: (s: PhotorealState) => void;
   /** la cámara gira lentamente alrededor del centro */
   orbit: boolean;
   camera?: { preset: CameraPreset; seq: number };
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealKey, onPhotoreal }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -242,6 +246,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
   themeRef.current = theme;
   const busModeRef = useRef(busColorMode);
   busModeRef.current = busColorMode;
+  const photorealOn = useRef(false);
   const busesRef = useRef<BusTrack[]>([]);
   busesRef.current = snapshot.state.buses;
 
@@ -369,10 +374,36 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     const map = mapRef.current;
     if (!ready || !map) return;
     for (const [key, ids] of Object.entries(LAYER_GROUPS) as [LayerKey, string[]][]) {
-      for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers[key] ? 'visible' : 'none');
+      // con la vista fotorrealista, Google ya aporta edificios e imagen: no se muestran los propios
+      const hiddenByPhotoreal = photorealOn.current && (key === 'buildings' || key === 'ortho');
+      for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers[key] && !hiddenByPhotoreal ? 'visible' : 'none');
     }
-    map.setTerrain(layers.terrain ? { source: 'vlc-terrain', exaggeration: 1.5 } : null);
+    if (!photorealOn.current) map.setTerrain(layers.terrain ? { source: 'vlc-terrain', exaggeration: 1.5 } : null);
   }, [layers, ready]);
+
+  // Vista fotorrealista de Google (deck.gl se descarga solo al activarla)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !photorealKey) return;
+    let dispose: (() => void) | undefined;
+    let cancelled = false;
+    photorealOn.current = true;
+    enablePhotoreal(map, photorealKey, onPhotoreal)
+      .then((d) => {
+        if (cancelled) d();
+        else dispose = d;
+      })
+      .catch((e: unknown) => {
+        photorealOn.current = false;
+        onPhotoreal({ state: 'error', message: e instanceof Error ? e.message : String(e) });
+      });
+    return () => {
+      cancelled = true;
+      photorealOn.current = false;
+      dispose?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photorealKey, ready]);
 
   // Modelo BIM (three.js se carga solo si hay modelo)
   const bimLayer = useRef<import('../bim/BimLayer').BimLayer | null>(null);
