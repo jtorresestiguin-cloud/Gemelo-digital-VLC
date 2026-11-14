@@ -5,14 +5,19 @@ import type { Snapshot } from '../core/store';
 import type { PerfSettings } from '../core/device';
 import type { LngLat, ServiceCategory } from '../core/types';
 import { SERVICE_CATEGORIES } from '../adapters/services';
-import { VALENCIA_BOUNDS, VALENCIA_CENTER } from '../data/static';
+import { VALENCIA_BOUNDS, VALENCIA_CENTER, type CameraPreset } from '../data/static';
+import { BUILDING_COLORS, applyTheme, type MapTheme } from './theme';
+import {
+  addTransitLayers, busesFrame, highlightLine, routesGeo, setBusColorMode, stopsGeo, themeTransit, type BusColorMode,
+} from './transit';
+import type { BusTrack } from '../core/types';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import {
   TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
+export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -39,6 +44,12 @@ async function loadBaseStyle(): Promise<{ style: StyleSpecification; online: boo
 
 /** Qué capas de MapLibre controla cada interruptor. */
 const LAYER_GROUPS: Record<LayerKey, string[]> = {
+  emtBuses: ['vlc-emt-buses'],
+  emtBuses3d: ['vlc-emt-bodies'],
+  emtLabels: ['vlc-emt-labels'],
+  emtTrails: ['vlc-emt-trails'],
+  emtRoutes: ['vlc-emt-routes-glow', 'vlc-emt-routes'],
+  emtStops: ['vlc-emt-stops'],
   services: ['vlc-services'],
   districts: ['vlc-districts-fill', 'vlc-districts-line'],
   ortho: ['vlc-ortho'],
@@ -64,7 +75,7 @@ const PNOA_TILES = 'https://www.ign.es/wmts/pnoa-ma?layer=OI.OrthoimageCoverage&
 /** Modelo digital de elevaciones global (Terrarium, AWS Open Data). */
 const TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
-function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean) {
+function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: MapTheme, busMode: BusColorMode) {
   const empty = { type: 'FeatureCollection' as const, features: [] };
   map.addSource('vlc-ortho', {
     type: 'raster', tiles: [PNOA_TILES], tileSize: 256, maxzoom: 19,
@@ -103,7 +114,7 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean) {
       'source-layer': 'building',
       minzoom: perf.buildingsMinZoom,
       paint: {
-        'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 10], 0, '#e7e9ee', 25, '#c7d0dd', 60, '#9fb0c9', 120, '#6f86a8'],
+        'fill-extrusion-color': BUILDING_COLORS[theme] as string,
         'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], perf.buildingsMinZoom, 0, perf.buildingsMinZoom + 0.6, ['coalesce', ['get', 'render_height'], 10]],
         'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
         'fill-extrusion-opacity': 0.88,
@@ -118,6 +129,7 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean) {
       'line-color': ['match', ['get', 'state'], 'fluid', TRAFFIC_COLORS.fluid, 'dense', TRAFFIC_COLORS.dense, 'congested', TRAFFIC_COLORS.congested, 'closed', TRAFFIC_COLORS.closed, TRAFFIC_COLORS.unknown],
       'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.8, 16, 6],
     } });
+  addTransitLayers(map, theme, busMode);
   map.addLayer({ id: 'vlc-routes', type: 'line', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'route'],
     paint: { 'line-color': '#7c3aed', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
   map.addLayer({ id: 'vlc-services', type: 'circle', source: 'vlc-services',
@@ -183,6 +195,17 @@ function popupHtml(p: Record<string, unknown>): string {
       const web = typeof p.website === 'string' && /^https?:\/\//.test(p.website) ? `<p><a href="${esc(p.website)}" target="_blank" rel="noopener">Web</a></p>` : '';
       return `${title}<table>${rows(pairs)}</table>${web}<p class="src">Fuente: Ajuntament de València</p>`;
     }
+    case 'bus': {
+      const ago = Math.max(0, Math.round((Date.now() - Number(p.ts)) / 1000));
+      const pairs: [string, unknown][] = [['Trayecto', p.trip]];
+      if (p.known) pairs.push(['Velocidad', `${p.speed} km/h (reconstruida)`], ['Rumbo', `${p.heading}°`]);
+      pairs.push(['Posición', `hace ${ago} s`]);
+      return `<strong>Línea ${esc(p.line)}</strong><table>${rows(pairs)}</table><p class="src">Fuente: EMT València (Geoportal)</p>`;
+    }
+    case 'bus-stop': {
+      const link = typeof p.url === 'string' && p.url.startsWith('https://') ? `<p><a href="${esc(p.url)}" target="_blank" rel="noopener">Próximas llegadas</a></p>` : '';
+      return `${title}<table>${rows([['Líneas', p.lines]])}</table>${link}`;
+    }
     case 'district': return `${title}<table>${rows([['Alertas activas', p.alerts]])}</table>`;
     case 'traffic': return `${title}<table>${rows([['Estado', p.label]])}</table>`;
     case 'bike': return `${title}<table>${rows([['Bicis', p.available], ['Anclajes libres', p.free], ['Total', p.total]])}</table>`;
@@ -204,12 +227,23 @@ interface Props {
   onMapReady?: (map: MlMap) => void;
   bim?: { geometry: IfcGeometry; placement: BimPlacement; seq: number };
   serviceCategories: ServiceCategory[];
+  theme: MapTheme;
+  busColorMode: BusColorMode;
+  /** la cámara gira lentamente alrededor del centro */
+  orbit: boolean;
+  camera?: { preset: CameraPreset; seq: number };
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const busModeRef = useRef(busColorMode);
+  busModeRef.current = busColorMode;
+  const busesRef = useRef<BusTrack[]>([]);
+  busesRef.current = snapshot.state.buses;
 
   useEffect(() => {
     let cancelled = false;
@@ -232,12 +266,13 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
       });
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left');
       map.on('load', () => {
-        addOverlays(map!, perf, online && !!map!.getSource('openmaptiles'));
+        addOverlays(map!, perf, online && !!map!.getSource('openmaptiles'), themeRef.current, busModeRef.current);
+        applyTheme(map!, themeRef.current);
         mapRef.current = map!;
         setReady(true);
         onMapReady?.(map!);
       });
-      const clickable = ['vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
+      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
       // Un único manejador: ficha solo del elemento más alto bajo el puntero (los distritos quedan debajo)
       let popup: maplibregl.Popup | undefined;
       map.on('click', (e) => {
@@ -245,6 +280,8 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         const pad = 4;
         const f = map!.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers })[0];
         popup?.remove();
+        const props = (f?.properties ?? {}) as Record<string, unknown>;
+        highlightLine(map!, props.kind === 'bus' ? String(props.line) : null);
         if (!f) return;
         popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(popupHtml(f.properties as Record<string, unknown>)).addTo(map!);
       });
@@ -278,6 +315,41 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     set('landmarks', landmarksGeo());
     set('districts', districtsGeo(snapshot.districts, snapshot.alerts));
   }, [snapshot, ready]);
+
+  // Rutas y paradas de la EMT (cambian poco)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    (map.getSource('vlc-emt-routes') as GeoJSONSource | undefined)?.setData(routesGeo(snapshot.state.busRoutes));
+  }, [snapshot.state.busRoutes, ready]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    (map.getSource('vlc-emt-stops') as GeoJSONSource | undefined)?.setData(stopsGeo(snapshot.state.busStops));
+  }, [snapshot.state.busStops, ready]);
+
+  // Animación de los autobuses entre lecturas (~12 imágenes/s; en pausa si la pestaña no se ve)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    let raf = 0;
+    let last = 0;
+    const frame = (t: number) => {
+      raf = requestAnimationFrame(frame);
+      if (t - last < 80 || document.hidden) return;
+      last = t;
+      const { points, bodies, trails } = busesFrame(busesRef.current, Date.now());
+      (map.getSource('vlc-emt-buses') as GeoJSONSource | undefined)?.setData(points);
+      (map.getSource('vlc-emt-bodies') as GeoJSONSource | undefined)?.setData(bodies);
+      (map.getSource('vlc-emt-trails') as GeoJSONSource | undefined)?.setData(trails);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [ready]);
+
+  useEffect(() => {
+    if (ready && mapRef.current) setBusColorMode(mapRef.current, busColorMode);
+  }, [busColorMode, ready]);
 
   // Los servicios cambian poco: solo se recalculan cuando llega una nueva descarga
   useEffect(() => {
@@ -334,6 +406,42 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bim, ready]);
+
+  useEffect(() => {
+    if (ready && mapRef.current) {
+      applyTheme(mapRef.current, theme);
+      themeTransit(mapRef.current, theme);
+    }
+  }, [theme, ready]);
+
+  useEffect(() => {
+    const p = camera?.preset;
+    if (p && mapRef.current) mapRef.current.flyTo({ center: p.center, zoom: p.zoom, pitch: p.pitch, bearing: p.bearing, speed: 0.9, curve: 1.4 });
+  }, [camera]);
+
+  // Girar alrededor: rotación lenta de la cámara; se pausa mientras el usuario interactúa
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !orbit) return;
+    let raf = 0;
+    let last = performance.now();
+    let paused = false;
+    const pause = () => (paused = true);
+    const resume = () => { paused = false; last = performance.now(); };
+    const step = (t: number) => {
+      if (!paused && !map.isMoving()) map.setBearing(map.getBearing() + ((t - last) / 1000) * 4);
+      last = t;
+      raf = requestAnimationFrame(step);
+    };
+    map.on('mousedown', pause); map.on('touchstart', pause);
+    map.on('mouseup', resume); map.on('touchend', resume);
+    raf = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(raf);
+      map.off('mousedown', pause); map.off('touchstart', pause);
+      map.off('mouseup', resume); map.off('touchend', resume);
+    };
+  }, [orbit, ready]);
 
   useEffect(() => {
     if (focus && mapRef.current) mapRef.current.flyTo({ center: focus.lngLat, zoom: focus.zoom ?? 15.5, pitch: 60, speed: 1.2 });

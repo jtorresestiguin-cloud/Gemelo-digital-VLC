@@ -2,7 +2,7 @@
 export type LngLat = [number, number];
 
 export type Protocol = 'REST' | 'MQTT' | 'NGSI-LD' | 'GTFS-RT' | 'OPC-UA';
-export type SourceId = 'traffic' | 'bikes' | 'air' | 'weather' | 'iot' | 'metro' | 'port' | 'services';
+export type SourceId = 'traffic' | 'bikes' | 'air' | 'weather' | 'iot' | 'metro' | 'port' | 'services' | 'emt';
 export type SourceMode = 'connecting' | 'live' | 'simulated' | 'error';
 
 export interface SourceStatus {
@@ -119,6 +119,39 @@ export interface PublicService {
   detail?: string;
 }
 
+/** Autobús de la EMT seguido entre lecturas (velocidad y rumbo reconstruidos). */
+export interface BusTrack {
+  id: string;
+  line: string;
+  trip: string;
+  /** posición de la lectura anterior y de la actual, para animar entre ambas */
+  from: LngLat;
+  to: LngLat;
+  /** instante (ms) en que se recibió la lectura actual en el navegador */
+  receivedAt: number;
+  /** marca de tiempo de la posición según la EMT (ms) */
+  ts: number;
+  speedKmh: number;
+  /** rumbo en grados desde el norte, sentido horario */
+  heading: number;
+  /** posiciones anteriores, la más reciente al final */
+  trail: LngLat[];
+  zoneId: string;
+}
+
+export interface BusStop {
+  id: string;
+  name: string;
+  lines: string[];
+  lngLat: LngLat;
+  arrivalsUrl?: string;
+}
+
+export interface BusRoute {
+  line: string;
+  coords: LngLat[][];
+}
+
 export interface CityState {
   traffic: TrafficSegment[];
   bikes: BikeStation[];
@@ -129,6 +162,11 @@ export interface CityState {
   metro: MetroLine[];
   port?: PortState;
   services: PublicService[];
+  buses: BusTrack[];
+  busStops: BusStop[];
+  busRoutes: BusRoute[];
+  /** marca de tiempo más reciente de las posiciones de la EMT (ms) */
+  busesAsOf?: number;
 }
 
 export type Severity = 'info' | 'warning' | 'critical';

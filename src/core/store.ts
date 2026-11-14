@@ -30,6 +30,7 @@ const INITIAL_SOURCES: SourceStatus[] = [
   { id: 'iot', name: 'Sensores IoT (ruido, incidencias)', provider: 'Broker MQTT', protocol: 'MQTT', mode: 'connecting', messages: 0 },
   { id: 'metro', name: 'Metrovalencia', provider: 'Feed GTFS-Realtime', protocol: 'GTFS-RT', mode: 'connecting', messages: 0 },
   { id: 'port', name: 'Port de València (PLCs)', provider: 'Servidor OPC UA', protocol: 'OPC-UA', mode: 'connecting', messages: 0 },
+  { id: 'emt', name: 'Autobuses EMT en tiempo real', provider: 'Geoportal · EMT València', protocol: 'REST', mode: 'connecting', messages: 0 },
   { id: 'services', name: 'Servicios públicos', provider: 'Ajuntament de València (Geoportal y datos abiertos)', protocol: 'REST', mode: 'connecting', messages: 0 },
 ];
 
@@ -37,7 +38,7 @@ const DEFAULT_WEATHER: Weather = { temperature: 20, precipitation: 0, windSpeed:
 
 /** Estado de la ciudad alimentado por el bus. Notifica a React con un throttle para no saturar el render. */
 export class CityStore {
-  private raw: CityState = { traffic: [], bikes: [], air: [], incidents: [], noise: [], metro: [], services: [] };
+  private raw: CityState = { traffic: [], bikes: [], air: [], incidents: [], noise: [], metro: [], services: [], buses: [], busStops: [], busRoutes: [] };
   private sources = new Map<SourceId, SourceStatus>(INITIAL_SOURCES.map((s) => [s.id, { ...s }]));
   private overrides: Overrides = { congest: [] };
   private alerts: Alert[] = [];
@@ -70,6 +71,9 @@ export class CityStore {
       case 'metro': r.metro = msg.data; break;
       case 'port': r.port = msg.data; break;
       case 'services': r.services = msg.data; break;
+      case 'buses': r.buses = msg.data; r.busesAsOf = msg.asOf; break;
+      case 'busStops': r.busStops = msg.data; break;
+      case 'busRoutes': r.busRoutes = msg.data; break;
       case 'noise': {
         const byId = new Map(r.noise.map((n) => [n.id, n]));
         msg.data.forEach((n) => byId.set(n.id, n));

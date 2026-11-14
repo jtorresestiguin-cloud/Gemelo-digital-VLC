@@ -18,6 +18,7 @@ la ciudad en 3D.
   | Sensores IoT (ruido, incidencias) | MQTT | Simulado |
   | Metrovalencia | GTFS-Realtime | Simulado |
   | Port de València (PLCs) | OPC UA | Simulado |
+  | Autobuses EMT (posición, rutas, paradas) | REST (ArcGIS) | **Real**: Geoportal (EMT València), cada 15 s |
   | Servicios públicos | REST (ArcGIS + CKAN) | **Real**: equipamientos municipales (Geoportal) y hospitales (opendata.vlci.valencia.es) |
 
   Frecuencia de actualización por API: tráfico cada 3 min, Valenbisi cada 2 min, calidad del
@@ -47,6 +48,15 @@ la ciudad en 3D.
   dirección, horario, teléfono y web. El motor de reglas los usa: R1 indica el hospital más
   cercano al incidente, y R2/R3 enumeran los colegios, centros sanitarios y residencias
   afectados del distrito.
+- **València en vivo (autobuses de la EMT)**: posición real de cada autobús cada 15 s,
+  animada de forma continua entre lecturas, con **estela**, etiqueta «línea · km/h · rumbo»,
+  **modelo 3D** al acercarse, trazado de las líneas con brillo y paradas al acercarse (con
+  enlace a próximas llegadas). La EMT solo publica posición, línea y trayecto: la velocidad
+  y el rumbo se **reconstruyen** siguiendo cada autobús entre lecturas
+  (`src/transit/emt.ts`). Modo de color por movimiento o por velocidad; al tocar un autobús
+  se resalta su línea.
+- **Estética y cámara**: mapa en **modo noche** (por defecto) o día, atajos **«Ir a…»**,
+  **girar alrededor** y **modo grabación** (tecla R) que deja solo el mapa para grabar vídeos.
 - **Los 19 distritos** con sus límites oficiales (portal de datos abiertos) coloreados según la
   peor alerta activa. Los elementos se asignan a su distrito por punto-en-polígono; si el
   servicio no responde, se usan polígonos aproximados (Voronoi de los centroides).

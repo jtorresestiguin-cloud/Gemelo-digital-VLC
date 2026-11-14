@@ -10,12 +10,33 @@ import { ServicesPanel } from './ui/ServicesPanel';
 import { SERVICE_CATEGORIES } from './adapters/services';
 import type { ServiceCategory } from './core/types';
 import type { Map as MlMap } from 'maplibre-gl';
-import { PORT_ASSETS } from './data/static';
+import { PORT_ASSETS, type CameraPreset } from './data/static';
+import { MapToolbar } from './ui/MapToolbar';
+import { TransitPanel } from './ui/TransitPanel';
+import type { BusColorMode } from './map/transit';
+import type { MapTheme } from './map/theme';
+
+const readPref = <T,>(key: string, fallback: T): T => {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : (JSON.parse(v) as T);
+  } catch {
+    return fallback;
+  }
+};
+const writePref = (key: string, v: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch {
+    /* sin almacenamiento */
+  }
+};
 
 const runtime = new CityRuntime();
 type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 
 const ALL_LAYERS: Record<LayerKey, boolean> = {
+  emtBuses: true, emtBuses3d: true, emtLabels: true, emtTrails: true, emtRoutes: true, emtStops: true,
   services: true, districts: true, ortho: false, terrain: false, bim: true,
   buildings: true, traffic: true, bikes: true, air: true, noise: false, metro: true, port: true, incidents: true, alerts: true, landmarks: true,
 };
@@ -23,7 +44,7 @@ const ALL_LAYERS: Record<LayerKey, boolean> = {
 export default function App() {
   const perf = useMemo(detectPerformance, []);
   const snapshot = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
-  const [tab, setTab] = useState<Tab>('alerts');
+  const [tab, setTab] = useState<Tab>('layers');
   const [layers, setLayers] = useState(ALL_LAYERS);
   const [focus, setFocus] = useState<{ lngLat: LngLat; seq: number; zoom?: number }>();
   const [baseMapOnline, setBaseMapOnline] = useState<boolean>();
@@ -34,6 +55,24 @@ export default function App() {
   const [bimModel, setBimModel] = useState<BimModel>();
   const [bimAnchor, setBimAnchor] = useState<LngLat>(PORT_ASSETS[0].lngLat);
   const [bimRotation, setBimRotation] = useState(32);
+  const [theme, setTheme] = useState<MapTheme>(() => readPref('vlc-theme', 'night'));
+  const [orbit, setOrbit] = useState(false);
+  const [camera, setCamera] = useState<{ preset: CameraPreset; seq: number }>();
+  const [recording, setRecording] = useState(false);
+  const [busMode, setBusMode] = useState<BusColorMode>('movement');
+
+  useEffect(() => writePref('vlc-theme', theme), [theme]);
+
+  // Modo grabación: R para entrar/salir, Esc para salir
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest('input, textarea')) return;
+      if (e.key === 'r' || e.key === 'R') setRecording((r) => !r);
+      if (e.key === 'Escape') setRecording(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const bim = useMemo(
     () => (bimModel ? { geometry: bimModel.geometry, placement: { anchor: bimAnchor, rotationDeg: bimRotation }, seq: 0 } : undefined),
     [bimModel, bimAnchor, bimRotation],
@@ -54,13 +93,13 @@ export default function App() {
   const tabs: [Tab, string][] = [
     ['alerts', `Alertas${snapshot.alerts.length ? ` (${snapshot.alerts.length})` : ''}`],
     ['sources', 'Fuentes'],
-    ['layers', 'Capas'],
+    ['layers', 'En vivo y capas'],
     ['analysis', 'Análisis'],
     ['scenarios', 'Escenarios'],
   ];
 
   return (
-    <div className="app">
+    <div className={`app ${recording ? 'recording' : ''}`} data-theme={theme}>
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>▮▮▮</span>
@@ -84,7 +123,23 @@ export default function App() {
         }}
         bim={bim}
         serviceCategories={serviceCats}
+        theme={theme}
+        orbit={orbit}
+        camera={camera}
+        busColorMode={busMode}
       />
+
+      <MapToolbar
+        theme={theme}
+        orbit={orbit}
+        onTheme={setTheme}
+        onOrbit={setOrbit}
+        onGo={(preset) => setCamera({ preset, seq: Date.now() })}
+        onRecord={() => setRecording(true)}
+      />
+      {recording && (
+        <button className="record-exit" onClick={() => setRecording(false)}>Modo grabación · pulsa R o Esc para salir</button>
+      )}
 
       {baseMapOnline === false && showBaseMapToast && (
         <button className="toast" onClick={() => setShowBaseMapToast(false)}>Cartografía base no disponible: se muestran solo las capas de datos. ✕</button>
@@ -110,6 +165,18 @@ export default function App() {
               layers={layers}
               onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
               header={
+                <>
+                <TransitPanel
+                  buses={snapshot.state.buses}
+                  routes={snapshot.state.busRoutes.length}
+                  stops={snapshot.state.busStops.length}
+                  asOf={snapshot.state.busesAsOf}
+                  status={snapshot.sources.find((s) => s.id === 'emt')}
+                  mode={busMode}
+                  onMode={setBusMode}
+                  layers={layers}
+                  onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
+                />
                 <ServicesPanel
                   services={snapshot.state.services}
                   status={snapshot.sources.find((s) => s.id === 'services')}
@@ -123,6 +190,7 @@ export default function App() {
                     if (window.innerWidth < 760) setCollapsed(true);
                   }}
                 />
+                </>
               }
             >
               <BimPanel

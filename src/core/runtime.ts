@@ -9,6 +9,7 @@ import { decodeRaw } from '../adapters/decoders';
 import { fetchAir, fetchBikes, fetchTraffic, fetchWeather } from '../adapters/opendata';
 import { approximateDistricts, fetchDistricts } from '../adapters/districts';
 import { SERVICES_TTL, fetchServices, readServicesCache } from '../adapters/services';
+import { BusTracker, fetchBusPositions, fetchRoutes, fetchStops } from '../transit/emt';
 import type { RawMessage, ScenarioName, SimSource, WorkerCommand } from '../sim/protocols';
 
 const MIN = 60_000;
@@ -38,7 +39,41 @@ export class CityRuntime {
     this.poll('bikes', 3 * MIN, async () => this.bus.publish({ source: 'bikes', protocol: 'REST', topic: 'bikes', data: await fetchBikes(), live: true, ts: Date.now() }));
     this.poll('air', 10 * MIN, async () => this.bus.publish({ source: 'air', protocol: 'REST', topic: 'air', data: await fetchAir(), live: true, ts: Date.now() }));
     this.startServices();
+    this.startEmt();
     this.poll('weather', 10 * MIN, async () => this.bus.publish({ source: 'weather', protocol: 'REST', topic: 'weather', data: await fetchWeather(), live: true, ts: Date.now() }));
+  }
+
+  /** Autobuses EMT: posiciones cada 15 s (movimiento reconstruido), paradas y rutas al arrancar. */
+  private startEmt(): void {
+    const tracker = new BusTracker();
+    let failures = 0;
+    const tick = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return; // pestaña oculta: no gastar datos
+      try {
+        const readings = await fetchBusPositions();
+        const now = Date.now();
+        const buses = tracker.update(readings, now);
+        const asOf = readings.reduce((m, b) => Math.max(m, b.ts), 0) || undefined;
+        this.bus.publish({ source: 'emt', protocol: 'REST', topic: 'buses', data: buses, asOf, live: true, ts: now });
+        this.store.setSourceStatus('emt', { detail: `${buses.length} autobuses con posición; velocidad y rumbo reconstruidos entre lecturas` });
+        failures = 0;
+      } catch (err) {
+        failures++;
+        const detail = `Sin respuesta de la EMT (${err instanceof Error ? err.message : err}); reintentando`;
+        this.store.setSourceStatus('emt', failures > 2 ? { mode: 'error', detail } : { detail });
+      }
+    };
+    void tick();
+    this.timers.push(setInterval(tick, 15_000));
+    fetchStops()
+      .then((data) => this.bus.publish({ source: 'emt', protocol: 'REST', topic: 'busStops', data, live: true, ts: Date.now() }))
+      .catch(() => { /* las paradas son opcionales */ });
+    // las rutas pesan más: se piden un poco después para no competir con la carga inicial
+    setTimeout(() => {
+      fetchRoutes()
+        .then((data) => this.bus.publish({ source: 'emt', protocol: 'REST', topic: 'busRoutes', data, live: true, ts: Date.now() }))
+        .catch(() => { /* las rutas son opcionales */ });
+    }, 3000);
   }
 
   /** Servicios públicos: caché local de 24 h; se refrescan por API al caducar. */

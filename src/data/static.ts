@@ -160,3 +160,23 @@ export const NOISE_SENSORS: { id: string; lngLat: LngLat }[] = [
   { id: 'N11', lngLat: [-0.3730, 39.4950] },
   { id: 'N12', lngLat: [-0.4030, 39.4700] },
 ];
+
+export interface CameraPreset {
+  id: string;
+  label: string;
+  center: LngLat;
+  zoom: number;
+  pitch: number;
+  bearing: number;
+}
+
+/** Atajos de cámara «Ir a…». */
+export const CAMERA_PRESETS: CameraPreset[] = [
+  { id: 'centre', label: 'Centro', center: [-0.3763, 39.4720], zoom: 15.6, pitch: 62, bearing: -28 },
+  { id: 'arts', label: 'Ciutat de les Arts', center: [-0.3520, 39.4555], zoom: 15.8, pitch: 65, bearing: 35 },
+  { id: 'port', label: 'Port', center: [-0.3230, 39.4500], zoom: 14.8, pitch: 60, bearing: -60 },
+  { id: 'turia', label: 'Jardí del Túria', center: [-0.3700, 39.4780], zoom: 14.6, pitch: 55, bearing: 70 },
+  { id: 'russafa', label: 'Russafa', center: [-0.3740, 39.4620], zoom: 16.2, pitch: 60, bearing: 10 },
+  { id: 'campanar', label: 'Campanar', center: [-0.3950, 39.4830], zoom: 15.4, pitch: 60, bearing: -45 },
+  { id: 'city', label: 'Toda la ciudad', center: [-0.3720, 39.4690], zoom: 12.6, pitch: 40, bearing: -15 },
+];

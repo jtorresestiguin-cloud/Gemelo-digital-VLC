@@ -8,7 +8,7 @@ const seg = (id: string, zoneId: string, state: TrafficSegment['state']): Traffi
 });
 
 const base = (): CityState => ({
-  traffic: [], bikes: [], air: [], incidents: [], noise: [], services: [],
+  traffic: [], bikes: [], air: [], incidents: [], noise: [], services: [], buses: [], busStops: [], busRoutes: [],
   metro: METRO_LINES.map((l) => ({ ...l, delayMin: 0, status: 'ok' as const })),
   weather: { temperature: 20, precipitation: 0, windSpeed: 5, weatherCode: 0 },
 });

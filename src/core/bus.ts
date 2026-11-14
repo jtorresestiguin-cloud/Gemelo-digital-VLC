@@ -1,5 +1,5 @@
 import type {
-  AirStation, BikeStation, Incident, MetroLine, NoiseSensor, PortState, Protocol, PublicService, SourceId,
+  AirStation, BikeStation, BusRoute, BusStop, BusTrack, Incident, MetroLine, NoiseSensor, PortState, Protocol, PublicService, SourceId,
   TrafficSegment, Weather,
 } from './types';
 
@@ -13,7 +13,10 @@ export type BusPayload =
   | { topic: 'noise'; data: NoiseSensor[] }
   | { topic: 'metro'; data: MetroLine[] }
   | { topic: 'port'; data: PortState }
-  | { topic: 'services'; data: PublicService[] };
+  | { topic: 'services'; data: PublicService[] }
+  | { topic: 'buses'; data: BusTrack[]; asOf?: number }
+  | { topic: 'busStops'; data: BusStop[] }
+  | { topic: 'busRoutes'; data: BusRoute[] };
 
 export type BusTopic = BusPayload['topic'];
 

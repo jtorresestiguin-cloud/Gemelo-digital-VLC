@@ -12,7 +12,7 @@ const MODE_LABEL: Record<SourceStatus['mode'], string> = {
 };
 const SEVERITY_LABEL = { critical: 'Crítica', warning: 'Aviso', info: 'Info' };
 const SOURCE_SHORT: Record<string, string> = {
-  traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Aire', weather: 'Meteo', iot: 'IoT', metro: 'Metro', port: 'Puerto', services: 'Servicios',
+  traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Aire', weather: 'Meteo', iot: 'IoT', metro: 'Metro', port: 'Puerto', services: 'Servicios', emt: 'EMT',
 };
 
 const ago = (ts?: number) => {
@@ -35,6 +35,7 @@ export function KpiBar({ snapshot }: { snapshot: Snapshot }) {
     ['Congestión', `${Math.round(jam * 100)}%`, jam > 0.5 ? 'bad' : jam > 0.3 ? 'warn' : 'ok'],
     ['NO₂ máx.', no2.length ? `${Math.round(Math.max(...no2))} µg/m³` : '—', no2.length && Math.max(...no2) >= 150 ? 'bad' : undefined],
     ['Tiempo', w ? `${Math.round(w.temperature)}° · ${w.precipitation.toFixed(1)} mm/h` : '—', w && w.precipitation >= 15 ? 'bad' : w && w.precipitation >= 2 ? 'warn' : undefined],
+    ['EMT', `${s.buses.length} buses`, s.buses.length ? 'ok' : undefined],
     ['Valenbisi', `${bikes} bicis`],
     ['Metro', metroBad ? `${metroBad} líneas afectadas` : 'Normal', metroBad ? 'warn' : 'ok'],
     ['Puerto', s.port ? `${s.port.gateQueue} camiones` : '—', s.port && s.port.gateQueue >= 40 ? 'warn' : undefined],
@@ -101,7 +102,8 @@ export function SourcesPanel({ sources, perf, baseMapOnline, districtsOfficial }
   );
 }
 
-const LAYER_LABELS: Record<LayerKey, string> = {
+/** Las capas de la EMT tienen su propio panel («València en vivo»). */
+const LAYER_LABELS: Partial<Record<LayerKey, string>> = {
   services: 'Servicios públicos',
   districts: 'Distritos (coloreados por alertas)', ortho: 'Ortofoto PNOA (IGN)', terrain: 'Relieve 3D',
   bim: 'Modelo BIM', buildings: 'Edificios 3D', traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Calidad del aire', noise: 'Ruido (IoT)',
