@@ -379,3 +379,17 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 .steps a { color: #93c5fd; }
 .moments button { padding: 6px 2px; font-size: 11px; }
 .realistic-attrib { background: rgba(10, 16, 28, 0.6); color: #cbd5e1; }
+
+/* Plegar el panel lateral también en escritorio */
+.panel-collapse {
+  position: absolute; left: -15px; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 26px; height: 52px; border-radius: 8px 0 0 8px; border: 1px solid var(--line); border-right: 0;
+  background: var(--panel-solid); color: var(--text); font-size: 18px; line-height: 1;
+}
+.panel-collapse:hover { background: #1e293b; }
+.panel.collapsed { transform: translateX(calc(100% + 12px)); }
+.panel.collapsed .panel-collapse { left: -40px; border-radius: 8px; border-right: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .panel-collapse { display: none; }
+  .panel.collapsed { transform: translateY(calc(100% - 64px)); }
+}

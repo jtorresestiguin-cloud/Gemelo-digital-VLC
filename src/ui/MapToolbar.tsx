@@ -2,6 +2,8 @@ import { CAMERA_PRESETS, type CameraPreset } from '../data/static';
 import type { MapTheme } from '../map/theme';
 
 interface Props {
+  minimized: boolean;
+  onMinimize: (m: boolean) => void;
   theme: MapTheme;
   orbit: boolean;
   onTheme: (t: MapTheme) => void;
@@ -16,7 +18,16 @@ interface Props {
 }
 
 /** Barra inferior del mapa: atajos de cámara, tema, giro y modo grabación. */
-export function MapToolbar({ theme, orbit, onTheme, onOrbit, onGo, onRecord, onTour, drone, onDrone, photoreal, onPhotoreal }: Props) {
+export function MapToolbar({ minimized, onMinimize, theme, orbit, onTheme, onOrbit, onGo, onRecord, onTour, drone, onDrone, photoreal, onPhotoreal }: Props) {
+  if (minimized) {
+    return (
+      <div className="map-toolbar">
+        <div className="toolbar-actions">
+          <button onClick={() => onMinimize(false)} title="Mostrar el menú" aria-label="Mostrar el menú">☰ Menú</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="map-toolbar">
       <div className="goto" role="group" aria-label="Ir a">
@@ -26,6 +37,7 @@ export function MapToolbar({ theme, orbit, onTheme, onOrbit, onGo, onRecord, onT
         ))}
       </div>
       <div className="toolbar-actions">
+        <button onClick={() => onMinimize(true)} title="Minimizar el menú" aria-label="Minimizar el menú">‹</button>
         <button className={theme === 'night' ? 'on' : ''} onClick={() => onTheme(theme === 'night' ? 'day' : 'night')} title="Cambiar entre mapa de noche y de día">
           {theme === 'night' ? '☾ Noche' : '☀ Día'}
         </button>

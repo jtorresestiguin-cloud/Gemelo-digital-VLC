@@ -60,11 +60,14 @@ const writePref = (key: string, v: unknown) => {
 const runtime = new CityRuntime();
 type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 
+/** Por defecto el mapa sale limpio: solo los edificios 3D; cada capa se activa desde el panel. */
 const ALL_LAYERS: Record<LayerKey, boolean> = {
-  emtBuses: true, emtBuses3d: true, emtLabels: true, emtTrails: true, emtRoutes: true, emtStops: true,
-  services: true, districts: true, ortho: false, terrain: false, bim: true,
-  buildings: true, traffic: true, bikes: true, air: true, noise: false, metro: true, port: true, incidents: true, alerts: true, landmarks: true,
+  emtBuses: false, emtBuses3d: false, emtLabels: false, emtTrails: false, emtRoutes: false, emtStops: false,
+  services: false, districts: false, ortho: false, terrain: false, bim: true,
+  buildings: true, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false,
 };
+/** Al encender los autobuses se encienden también sus complementos (etiquetas, estelas, 3D). */
+const EMT_SET: LayerKey[] = ['emtBuses', 'emtBuses3d', 'emtLabels', 'emtTrails'];
 
 export default function App() {
   const perf = useMemo(detectPerformance, []);
@@ -76,7 +79,19 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [showBaseMapToast, setShowBaseMapToast] = useState(true);
   const [map, setMap] = useState<MlMap>();
-  const [serviceCats, setServiceCats] = useState<ServiceCategory[]>(SERVICE_CATEGORIES.map((c) => c.id));
+  const [serviceCats, setServiceCats] = useState<ServiceCategory[]>([]);
+  const [toolbarMin, setToolbarMin] = useState<boolean>(() => readPref('vlc-toolbar-min', false));
+  useEffect(() => writePref('vlc-toolbar-min', toolbarMin), [toolbarMin]);
+  const toggleLayer = (k: LayerKey) => {
+    setLayers((l) => {
+      const on = !l[k];
+      const next = { ...l, [k]: on };
+      if (k === 'emtBuses' && on) EMT_SET.forEach((x) => (next[x] = true));
+      return next;
+    });
+    // los servicios sin categorías no mostrarían nada: al encenderlos se marcan todas
+    if (k === 'services' && !layers.services && serviceCats.length === 0) setServiceCats(SERVICE_CATEGORIES.map((c) => c.id));
+  };
   const [bimModel, setBimModel] = useState<BimModel>();
   const [bimAnchor, setBimAnchor] = useState<LngLat>(PORT_ASSETS[0].lngLat);
   const [bimRotation, setBimRotation] = useState(32);
@@ -260,6 +275,8 @@ export default function App() {
       )}
 
       <MapToolbar
+        minimized={toolbarMin}
+        onMinimize={setToolbarMin}
         theme={theme}
         orbit={orbit}
         onTheme={setTheme}
@@ -348,6 +365,9 @@ export default function App() {
       )}
 
       <aside className={`panel ${collapsed ? 'collapsed' : ''}`}>
+        <button className="panel-collapse" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? 'Mostrar el panel' : 'Ocultar el panel'} title={collapsed ? 'Mostrar el panel' : 'Ocultar el panel'}>
+          {collapsed ? '‹' : '›'}
+        </button>
         <div className="panel-handle" onClick={() => setCollapsed((c) => !c)} role="button" aria-label="Mostrar u ocultar panel">
           <span />
         </div>
@@ -362,7 +382,7 @@ export default function App() {
           {tab === 'layers' && (
             <LayersPanel
               layers={layers}
-              onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
+              onToggle={toggleLayer}
               header={
                 <>
                 <RealisticPanel
@@ -395,7 +415,7 @@ export default function App() {
                   mode={busMode}
                   onMode={setBusMode}
                   layers={layers}
-                  onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
+                  onToggle={toggleLayer}
                 />
                 <ServicesPanel
                   services={snapshot.state.services}
