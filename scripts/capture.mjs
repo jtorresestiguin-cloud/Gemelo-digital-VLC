@@ -1,0 +1,39 @@
+// Abre la web PUBLICADA, activa la ciudad fotorrealista y guarda capturas de varios puntos.
+// Se ejecuta en GitHub Actions (workflow «Capturas de la web»).
+import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync } from 'node:fs';
+
+const URL = process.env.SITE_URL ?? 'https://jtorresestiguin-cloud.github.io/Gemelo-digital-VLC/';
+const OUT = 'capturas';
+mkdirSync(OUT, { recursive: true });
+
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+const stats = { tiles: 0, tileErrors: 0, ion: 0, errors: [] };
+page.on('response', (r) => {
+  const u = r.url();
+  if (u.includes('tile.googleapis.com')) (r.ok() ? stats.tiles++ : stats.tileErrors++);
+  if (u.includes('api.cesium.com')) stats.ion = r.status();
+});
+page.on('pageerror', (e) => stats.errors.push(e.message));
+page.on('console', (m) => { if (m.type() === 'error') stats.errors.push(m.text().slice(0, 200)); });
+
+await page.goto(URL, { waitUntil: 'networkidle', timeout: 90_000 });
+await page.waitForTimeout(4000);
+// modo grabación fuera: interesa ver la interfaz en la primera captura
+await page.click('.toolbar-actions >> text=Realista');
+await page.waitForTimeout(25_000);
+await page.screenshot({ path: `${OUT}/01-inicio.png` });
+console.log('Estado del panel:', await page.locator('.photoreal .error').innerText().catch(() => 'sin errores'));
+
+for (const [name, label] of [['02-centro', 'Centro'], ['03-ciutat-arts', 'Ciutat de les Arts'], ['04-port', 'Port']]) {
+  await page.click(`.goto >> text=${label}`);
+  await page.waitForTimeout(30_000);
+  await page.keyboard.press('r'); // solo el mapa
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${OUT}/${name}.png` });
+  await page.keyboard.press('r');
+}
+writeFileSync(`${OUT}/stats.json`, JSON.stringify(stats, null, 2));
+console.log(JSON.stringify(stats, null, 2));
+await browser.close();

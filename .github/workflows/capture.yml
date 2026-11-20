@@ -1,0 +1,30 @@
+name: Capturas de la web
+
+# Abre la web publicada en un navegador, activa la ciudad fotorrealista y guarda
+# capturas en la rama «capturas» (para revisar el aspecto real sin abrir la web).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save playwright@1.63.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/capture.mjs
+      - name: Publicar capturas en la rama «capturas»
+        run: |
+          cd capturas
+          git init -q -b capturas
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -q -m "Capturas de la web publicada"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" capturas
