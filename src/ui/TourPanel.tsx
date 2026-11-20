@@ -3,6 +3,7 @@ import type { PublicService } from '../core/types';
 import { buildTimeline } from '../tour/camera';
 import { LANDMARK_TOUR, parseTour, tourFromServices, type Tour } from '../tour/tours';
 import type { VideoQuality } from '../tour/player';
+import { CURATED_TOURS } from '../tour/curated';
 
 interface Props {
   services: PublicService[];
@@ -31,7 +32,7 @@ export function TourPanel({ services, photoreal, onPlay, onGuided, onClose }: Pr
   const [quality, setQuality] = useState<VideoQuality>('1080p');
 
   const tours = useMemo(() => {
-    const list: Tour[] = [LANDMARK_TOUR];
+    const list: Tour[] = [LANDMARK_TOUR, ...CURATED_TOURS];
     const fromData = [
       tourFromServices(services, { title: 'Hospitales públicos', filter: (s) => s.kind === 'Hospital' && !!s.publicFunded, max: 8 }),
       tourFromServices(services, { title: 'Mercados municipales', filter: (s) => s.category === 'market', max: 8 }),
