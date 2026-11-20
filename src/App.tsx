@@ -17,6 +17,9 @@ import type { BusColorMode } from './map/transit';
 import { PhotorealPanel } from './ui/PhotorealPanel';
 import type { PhotorealState } from './map/google3d';
 import { TourPanel } from './ui/TourPanel';
+import { DroneHelp, GuidedCard } from './ui/FlightOverlays';
+import { DroneController } from './map/drone';
+import { GuidedTour, type GuidedState } from './tour/guided';
 import { playTour, type TourHandle } from './tour/player';
 import type { Tour } from './tour/tours';
 import type { TourFrame } from './tour/camera';
@@ -73,6 +76,36 @@ export default function App() {
   const [photorealState, setPhotorealState] = useState<PhotorealState>({ state: 'off' });
   const activeGoogleKey = BUILD_GOOGLE_KEY || googleKey;
   const [tourOpen, setTourOpen] = useState(false);
+  const [drone, setDrone] = useState(false);
+  const [droneCtl, setDroneCtl] = useState<DroneController>();
+  const [guided, setGuided] = useState<{ ctl: GuidedTour; state: GuidedState }>();
+
+  // Modo dron: el controlador vive mientras el modo está activo
+  useEffect(() => {
+    if (!map || !drone) return;
+    const ctl = new DroneController(map);
+    ctl.start();
+    setDroneCtl(ctl);
+    setOrbit(false);
+    return () => {
+      ctl.stop();
+      setDroneCtl(undefined);
+    };
+  }, [map, drone]);
+
+  const startGuided = (tour: Tour) => {
+    if (!map) return;
+    setTourOpen(false);
+    setOrbit(false);
+    guided?.ctl.dispose();
+    const ctl = new GuidedTour(map, tour, (state) => setGuided((g) => (g ? { ...g, state } : g)));
+    setGuided({ ctl, state: { index: 0, flying: true, userControl: false, autoplay: false } });
+    ctl.goTo(0);
+  };
+  const exitGuided = () => {
+    guided?.ctl.dispose();
+    setGuided(undefined);
+  };
   const [tourRun, setTourRun] = useState<{ tour: Tour; handle: TourHandle; record: boolean; frame?: TourFrame; t: number; total: number; status?: string }>();
   const [videoUrl, setVideoUrl] = useState<{ url: string; name: string }>();
   const photorealRef = useRef(photorealState);
@@ -80,6 +113,8 @@ export default function App() {
 
   const startTour = (tour: Tour, o: { record: boolean; music: boolean; quality: '720p' | '1080p' }) => {
     if (!map) return;
+    exitGuided();
+    setDrone(false);
     setTourOpen(false);
     setOrbit(false);
     setVideoUrl(undefined);
@@ -140,7 +175,7 @@ export default function App() {
   ];
 
   return (
-    <div className={`app ${recording || tourRun ? 'recording' : ''}`} data-theme={theme}>
+    <div className={`app ${recording || tourRun ? 'recording' : ''} ${guided || drone ? 'flying' : ''}`} data-theme={theme}>
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>▮▮▮</span>
@@ -189,12 +224,27 @@ export default function App() {
         onGo={(preset) => setCamera({ preset, seq: Date.now() })}
         onRecord={() => setRecording(true)}
         onTour={() => setTourOpen((v) => !v)}
+        drone={drone}
+        onDrone={setDrone}
       />
+      {guided && !tourRun && (
+        <GuidedCard
+          tour={guided.ctl.tour}
+          state={guided.state}
+          onPrev={() => guided.ctl.prev()}
+          onNext={() => guided.ctl.next()}
+          onResume={() => guided.ctl.resume()}
+          onAutoplay={(on) => guided.ctl.setAutoplay(on)}
+          onExit={exitGuided}
+        />
+      )}
+      {drone && !tourRun && <DroneHelp controller={droneCtl} onExit={() => setDrone(false)} />}
       {tourOpen && !tourRun && (
         <TourPanel
           services={snapshot.state.services}
           photoreal={photorealState.state === 'on'}
           onPlay={startTour}
+          onGuided={startGuided}
           onClose={() => setTourOpen(false)}
         />
       )}

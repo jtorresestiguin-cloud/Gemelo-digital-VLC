@@ -8,6 +8,7 @@ interface Props {
   services: PublicService[];
   photoreal: boolean;
   onPlay: (tour: Tour, opts: { record: boolean; music: boolean; quality: VideoQuality }) => void;
+  onGuided: (tour: Tour) => void;
   onClose: () => void;
 }
 
@@ -22,7 +23,7 @@ function downloadJson(tour: Tour) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-export function TourPanel({ services, photoreal, onPlay, onClose }: Props) {
+export function TourPanel({ services, photoreal, onPlay, onGuided, onClose }: Props) {
   const [custom, setCustom] = useState<Tour>();
   const [error, setError] = useState<string>();
   const [selected, setSelected] = useState(LANDMARK_TOUR.id);
@@ -62,8 +63,8 @@ export function TourPanel({ services, photoreal, onPlay, onClose }: Props) {
         <button className="link" onClick={onClose} aria-label="Cerrar">✕</button>
       </div>
       <p className="muted small">
-        Vuelo cinematográfico por la ciudad con rótulos. Se puede ver en directo o grabar a vídeo con música
-        generada en el navegador{photoreal ? ', sobre la vista fotorrealista de Google' : ''}.
+        Visita interactiva por la ciudad{photoreal ? ' fotorrealista' : ''}: la cámara te lleva a cada parada y, en cuanto
+        tocas el mapa o el teclado, tomas el control y exploras libremente. También se puede grabar como vídeo.
       </p>
       <div className="tour-list">
         {tours.map((t) => (
@@ -84,6 +85,9 @@ export function TourPanel({ services, photoreal, onPlay, onClose }: Props) {
         <button className="link" onClick={() => downloadJson(tour)}>Descargar este guion</button>
       </div>
       {error && <p className="error small">{error}</p>}
+      <button className="file-btn big-action" onClick={() => onGuided(tour)}>▶ Empezar visita interactiva</button>
+      <details className="video-options">
+        <summary>Grabar como vídeo</summary>
       <div className="tour-options">
         <label className="switch"><span>Música generada</span><input type="checkbox" checked={music} onChange={() => setMusic(!music)} /><i aria-hidden /></label>
         <div className="seg" role="group" aria-label="Calidad del vídeo">
@@ -92,10 +96,11 @@ export function TourPanel({ services, photoreal, onPlay, onClose }: Props) {
         </div>
       </div>
       <div className="row tour-actions">
-        <button className="secondary" onClick={() => onPlay(tour, { record: false, music, quality })}>▶ Ver ({fmtDur(duration)})</button>
+        <button className="secondary" onClick={() => onPlay(tour, { record: false, music, quality })}>▶ Ver como película ({fmtDur(duration)})</button>
         <button className="file-btn" onClick={() => onPlay(tour, { record: true, music, quality })}>● Grabar vídeo</button>
       </div>
       <p className="muted small">Al grabar, primero se carga la ciudad parada a parada y luego se graba en tiempo real. No cambies de pestaña mientras tanto.</p>
+      </details>
     </div>
   );
 }

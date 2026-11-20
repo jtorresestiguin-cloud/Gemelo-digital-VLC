@@ -60,6 +60,14 @@ la ciudad en 3D.
 - **Vista fotorrealista 3D (Google)**: la ciudad con los «Photorealistic 3D Tiles» de
   Google (fotogrametría aérea), dibujados con deck.gl dentro del mapa y con los datos del
   gemelo encima. Requiere una clave propia (ver *Vista fotorrealista* más abajo).
+- **Volar por la ciudad 3D**:
+  - **Modo dron** (botón *🛩 Dron*): vuelo libre con teclado (W/S avanzar, A/D lateral,
+    Q/E bajar/subir, flechas para girar y mirar al horizonte, Mayús rápido) o con botones
+    táctiles, con inercia suave y cielo con horizonte. Combinado con la vista fotorrealista
+    de Google es una visita aérea por la que uno se mueve libremente.
+  - **Visita guiada interactiva** (*✈ Recorrido → Empezar visita interactiva*): la cámara
+    vuela a cada hito y gira despacio; en cuanto se toca el mapa o el teclado, el usuario
+    toma el control y explora; «Anterior / Siguiente / Volver a la parada» y avance automático.
 - **Recorrido aéreo cinematográfico** (botón *✈ Recorrido*): vuelo por los hitos de la ciudad
   (Torres de Serrans, Micalet, Llotja, Estació del Nord, Túria, Ciutat de les Arts, Port…)
   con rótulos, que se puede ver en directo o **grabar a vídeo** (MP4 H.264 o WebM, 720p/1080p)

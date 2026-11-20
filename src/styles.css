@@ -338,3 +338,40 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 .video-ready { display: flex; gap: 8px; align-items: center; bottom: 64px; z-index: 8; }
 .video-ready a { color: #93c5fd; font-weight: 600; }
 @media (max-width: 760px) { .tour-panel { left: 8px; right: 8px; width: auto; bottom: calc(46vh + 56px); max-height: 50vh; } }
+
+/* Visita guiada interactiva y modo dron */
+.big-action { justify-content: center; padding: 10px 12px; font-size: 14px; }
+.video-options summary { cursor: pointer; font-size: 13px; color: #cbd5e1; padding: 4px 0; }
+.video-options[open] { display: flex; flex-direction: column; gap: 8px; }
+.guided-card, .drone-help {
+  position: absolute; z-index: 6; left: 12px; bottom: 64px; width: 360px;
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.drone-help { left: auto; right: 404px; width: 300px; }
+.guided-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.guided-accent { width: 44px; height: 4px; border-radius: 2px; background: var(--accent); margin-top: 4px; }
+.guided-card > strong { font-size: 20px; line-height: 1.15; }
+.guided-sub { font-size: 13px; color: #cbd5e1; }
+.guided-hint { min-height: 2.8em; }
+.guided-actions { display: flex; gap: 6px; }
+.guided-actions button { flex: 1; justify-content: center; }
+.guided-actions button:disabled { opacity: 0.4; cursor: default; }
+.small-switch { font-size: 12px; padding: 2px 0; }
+.keys kbd {
+  display: inline-block; min-width: 18px; padding: 0 4px; margin: 0 1px; border-radius: 4px; text-align: center;
+  border: 1px solid var(--line); background: rgba(51, 65, 85, 0.7); color: var(--text); font: 600 11px/18px Inter, system-ui, sans-serif;
+}
+.drone-pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.drone-pad button {
+  height: 40px; border-radius: 8px; border: 1px solid var(--line); background: rgba(51, 65, 85, 0.75);
+  font-size: 18px; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.drone-pad button:active { background: #2563eb; }
+@media (max-width: 760px) {
+  .guided-card, .drone-help { left: 8px; right: 8px; width: auto; bottom: calc(46vh + 56px); }
+  .app .panel.collapsed ~ .guided-card, .app .panel.collapsed ~ .drone-help { bottom: 120px; }
+  .drone-help .keys { display: none; }
+}
+.app.flying .goto { display: none; }

@@ -70,5 +70,13 @@ export function applyTheme(map: MlMap, theme: MapTheme): void {
     map.setPaintProperty('vlc-buildings', 'fill-extrusion-color', BUILDING_COLORS[theme]);
     map.setPaintProperty('vlc-buildings', 'fill-extrusion-opacity', theme === 'night' ? 0.95 : 0.88);
   }
+  // cielo y horizonte: se ven al inclinar la cámara (modo dron, visita guiada)
+  try {
+    map.setSky(theme === 'night'
+      ? { 'sky-color': '#05080f', 'horizon-color': '#1d3557', 'fog-color': '#0a101c', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.4 }
+      : { 'sky-color': '#7fb3e6', 'horizon-color': '#dceaf7', 'fog-color': '#e8eef5', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.4 });
+  } catch {
+    /* versión de MapLibre sin cielo */
+  }
   map.getContainer().dataset.theme = theme;
 }
