@@ -12,7 +12,7 @@ async function dump(name: string, layer: string) {
   console.log(`\n### ${name} (${layer}) «${meta?.name}» geom=${meta?.geometryType} n=${feats.length} campos=${(meta?.fields ?? []).map((f: { name: string }) => f.name).join(',')}`);
   for (const f of feats) {
     const p = f.properties ?? {};
-    const label = [p.nombre, p.name, p.denominacion, p.nom, p.titulo, p.equipamien, p.descripcio, p.tipo, p.ubicacion, p.direccion].filter(Boolean).slice(0, 3).join(' | ');
+    const label = [p.denominaci, p.nombre_edificio, p.numero, p.situacion, p.clasificac, p.grad_prote, p.barrio, p.ruta, p.tipo_ruta, p.nombre].filter((v) => v !== null && v !== undefined && v !== '').slice(0, 5).join(' | ');
     let c = f.geometry?.coordinates;
     if (f.geometry?.type === 'Polygon') c = c[0][0];
     if (f.geometry?.type === 'MultiPolygon') c = c[0][0][0];
@@ -24,10 +24,7 @@ async function dump(name: string, layer: string) {
 }
 
 it('puntos de interés', async () => {
-  await dump('Monumentos turísticos', 'Turismo/MapServer/202');
-  await dump('Recursos turísticos', 'Turismo/MapServer/226');
   await dump('Refugios antiaéreos', 'Turismo/MapServer/229');
-  await dump('Patrimonio industrial Grau', 'Turismo/MapServer/1');
   await dump('Edificaciones industriales', 'Turismo/MapServer/218');
-  await dump('Oficinas de turismo', 'Turismo/MapServer/227');
+  await dump('Recursos turísticos (ruta)', 'Turismo/MapServer/226');
 }, 280_000);
