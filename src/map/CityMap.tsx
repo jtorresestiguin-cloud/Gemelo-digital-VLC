@@ -15,7 +15,7 @@ import { enablePhotoreal, setBaseMapVisible, type PhotorealCredential, type Phot
 import type { RealisticOptions, RealisticStatus } from '../realistic/RealisticLayer';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
-import { monumentById, monumentsGeo, type Monument } from '../tour/monuments';
+import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
 import {
   TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
@@ -197,6 +197,14 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
 
 const escHtml = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
+function visitHtml(m: Monument): string {
+  const v = m.info.visit;
+  if (!v) return '';
+  const safeUrl = /^https:\/\//.test(v.url) ? escHtml(v.url) : '#';
+  return `<div class="mon-visit">${v.hours ? `<div>🕒 ${escHtml(v.hours)}</div>` : ''}<div>🎟 ${escHtml(v.price)}</div>`
+    + `<div class="mon-check">Orientativo (${VISIT_CHECKED}) · <a href="${safeUrl}" target="_blank" rel="noopener">confirmar en la web oficial</a></div></div>`;
+}
+
 /** Ficha breve de un monumento: qué es, cuándo y quién, y en qué visitas aparece. */
 export function monumentHtml(m: Monument): string {
   const meta = [m.info.when, m.info.who].filter(Boolean).map(escHtml).join(' · ');
@@ -207,6 +215,7 @@ export function monumentHtml(m: Monument): string {
   const route = `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(5)},${lng.toFixed(5)}`;
   return `<div class="monument-card"><strong>${escHtml(m.name)}</strong>${meta ? `<div class="mon-meta">${meta}</div>` : ''}`
     + `<p>${escHtml(m.info.text)}</p>`
+    + visitHtml(m)
     + `<div class="mon-label">Aparece en la visita</div><div class="mon-tours">${tours}</div>`
     + `<div class="mon-actions"><button data-act="zoom">🔍 Acercar</button><a href="${route}" target="_blank" rel="noopener">📍 Cómo llegar</a></div></div>`;
 }
@@ -330,7 +339,11 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         if (!f) return;
         const mon = props.kind === 'monument' ? monumentById(String(props.id)) : undefined;
         if (mon) {
-          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'monument-popup' }).setLngLat(mon.lngLat).setHTML(monumentHtml(mon)).addTo(map!);
+          // la ficha se abre encima del punto y el mapa baja el punto para que quepa entera
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'monument-popup', anchor: 'bottom', offset: 10 })
+            .setLngLat(mon.lngLat).setHTML(monumentHtml(mon)).addTo(map!);
+          const h = map!.getContainer().clientHeight;
+          map!.easeTo({ center: mon.lngLat, offset: [0, Math.round(h * 0.3)], duration: 600 });
           const el = popup.getElement();
           el.querySelector('[data-act="zoom"]')?.addEventListener('click', () =>
             map!.flyTo({ center: mon.lngLat, zoom: mon.view.zoom, pitch: mon.view.pitch, bearing: mon.view.bearing, speed: 0.8 }));

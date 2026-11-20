@@ -12,7 +12,27 @@ export interface MonumentInfo {
   when?: string;
   who?: string;
   text: string;
+  /** horario y precio para visitarlo por dentro (orientativos) */
+  visit?: Visit;
 }
+
+export interface Visit {
+  hours?: string;
+  price: string;
+  /** página oficial donde confirmar horario y precio */
+  url: string;
+}
+
+/** Fecha de la última revisión de horarios y precios. */
+export const VISIT_CHECKED = 'nov. 2026';
+
+const VV = 'https://www.visitvalencia.com/que-hacer-valencia/cultura-valenciana';
+/** Monumentos municipales (Lonja, torres…): mismo horario y tarifa. */
+const MUNICIPAL: Visit = {
+  hours: 'Lun–sáb 10–19 h · dom. y festivos 10–14 h',
+  price: '2 € (reducida 1 €) · gratis domingos y festivos',
+  url: `${VV}/monumentos-en-valencia`,
+};
 
 export interface Monument {
   id: string;
@@ -27,6 +47,36 @@ export interface Monument {
 
 /** Paradas que son zonas amplias, no un monumento concreto. */
 const AREAS = new Set(['Ciutat Vella', 'Ciudad de las Artes y las Ciencias', 'Barrio del Mercat']);
+
+const VISITS: Record<string, Visit> = {
+  'Torres de Serranos': MUNICIPAL,
+  'Torres de Quart': MUNICIPAL,
+  'Lonja de la Seda': { ...MUNICIPAL, url: `${VV}/monumentos-en-valencia/lonja-seda` },
+  "L'Almoina": { ...MUNICIPAL, hours: 'Mar–sáb 10–19 h · dom. y festivos 10–14 h' },
+  'Catedral y Miguelete': {
+    hours: 'Subida al Miguelete 10–18:45 h',
+    price: 'Miguelete 3 € (taquilla al pie de la torre) · Catedral, entrada aparte',
+    url: `${VV}/monumentos-en-valencia/miguelete`,
+  },
+  'Museo de Bellas Artes': { hours: 'Mar–dom 10–20 h', price: 'Gratis', url: `${VV}/monumentos-en-valencia` },
+  'Refugio de Serranos': {
+    hours: 'Mar–sáb 10–14 h y 15–19 h · dom. 10–14 h',
+    price: 'Gratis · con reserva en el 962 081 390',
+    url: `${VV}/refugios-antiaereos/refugio-serranos`,
+  },
+  'Museo del Arroz': {
+    hours: 'Mar–sáb 10–14 h y 15–19 h · lunes cerrado',
+    price: '2 € (reducida 1 €) · gratis domingos y festivos',
+    url: 'https://www.valencia.es/es/-/infociudad-museo-del-arroz',
+  },
+  "L'Oceanogràfic": {
+    hours: 'Todos los días · horario según temporada',
+    price: 'Entrada general desde 35,90 €',
+    url: 'https://www.oceanografic.org/en/planifica-tu-visita-al-oceanografic-de-valencia/prices-and-schedules/',
+  },
+  "L'Hemisfèric": { price: 'Entradas y horarios en la web oficial', url: 'https://www.cac.es/' },
+  'Museo de las Ciencias': { price: 'Entradas y horarios en la web oficial', url: 'https://www.cac.es/' },
+};
 
 const INFO: Record<string, MonumentInfo> = {
   'Torres de Serranos': { when: '1392–1398', who: 'Pere Balaguer', text: 'Puerta principal de la muralla medieval. Desde lo alto se hace la Crida que abre las Fallas.' },
@@ -103,7 +153,7 @@ function build(): Monument[] {
         id: slug(s.name),
         name: s.name,
         lngLat: s.center,
-        info: INFO[s.name] ?? { text: s.subtitle ?? '' },
+        info: { ...(INFO[s.name] ?? { text: s.subtitle ?? '' }), visit: VISITS[s.name] },
         view: { zoom: s.zoom, pitch: s.pitch, bearing: s.bearing },
         tours: [ref],
       });

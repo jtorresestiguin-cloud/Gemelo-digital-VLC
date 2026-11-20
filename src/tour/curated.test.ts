@@ -45,3 +45,14 @@ describe('fichas de monumentos', () => {
     expect(html).toContain('google.com/maps/dir');
   });
 });
+
+describe('horarios y precios', () => {
+  it('los monumentos visitables muestran horario, precio y enlace oficial', () => {
+    const visitable = MONUMENTS.filter((m) => m.info.visit);
+    expect(visitable.map((m) => m.name)).toEqual(expect.arrayContaining(['Lonja de la Seda', 'Catedral y Miguelete', 'Refugio de Serranos', 'Torres de Serranos']));
+    for (const m of visitable) expect(m.info.visit!.url).toMatch(/^https:\/\//);
+    const html = monumentHtml(MONUMENTS.find((m) => m.name === 'Lonja de la Seda')!);
+    expect(html).toContain('🎟 2 €');
+    expect(html).toContain('confirmar en la web oficial');
+  });
+});
