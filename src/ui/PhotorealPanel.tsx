@@ -24,10 +24,9 @@ export function PhotorealPanel({ enabled, state, buildCred, savedCred, onSaveCre
   };
   return (
     <div className="photoreal">
-      <h4>Ciudad fotorrealista 3D</h4>
+      <h4>Fotogrametría de Google (opcional, requiere cuenta)</h4>
       <p className="muted small">
-        Los modelos 3D fotorrealistas de Google (fotogrametría aérea: fachadas, árboles, barcos…), los mismos del vídeo
-        de Palma. Encima se mantienen los datos del gemelo y se puede volar con el dron o la visita guiada.
+        Si en algún momento tenéis cuenta: los modelos 3D de Google con fachadas fotografiadas, los del vídeo de Palma.
       </p>
       {!cred && (
         <>

@@ -15,6 +15,8 @@ import { MapToolbar } from './ui/MapToolbar';
 import { TransitPanel } from './ui/TransitPanel';
 import type { BusColorMode } from './map/transit';
 import { PhotorealPanel } from './ui/PhotorealPanel';
+import { RealisticPanel } from './ui/RealisticPanel';
+import type { RealisticOptions, RealisticStatus } from './realistic/RealisticLayer';
 import type { PhotorealCredential, PhotorealState } from './map/google3d';
 import { TourPanel } from './ui/TourPanel';
 import { DroneHelp, GuidedCard } from './ui/FlightOverlays';
@@ -87,18 +89,26 @@ export default function App() {
   const [photoreal, setPhotoreal] = useState(false);
   const [photorealState, setPhotorealState] = useState<PhotorealState>({ state: 'off' });
   const activeCred = BUILD_CRED ?? savedCred;
+  const [realistic, setRealistic] = useState<RealisticOptions | null>(null);
+  const [realisticStatus, setRealisticStatus] = useState<RealisticStatus | null>(null);
+  const realisticRef = useRef(realistic);
+  realisticRef.current = realistic;
+  // los dos modos 3D son excluyentes
+  useEffect(() => { if (realistic) setPhotoreal(false); }, [realistic !== null]);
+  useEffect(() => { if (photoreal) setRealistic(null); }, [photoreal]);
   // la ciudad fotorrealista se ve de día (como una foto); al salir se recupera el tema anterior
   const themeBeforePhotoreal = useRef<MapTheme | null>(null);
   useEffect(() => {
-    if (photoreal && themeBeforePhotoreal.current === null) {
+    const realView = photoreal || realistic !== null;
+    if (realView && themeBeforePhotoreal.current === null) {
       themeBeforePhotoreal.current = theme;
       setTheme('day');
-    } else if (!photoreal && themeBeforePhotoreal.current !== null) {
+    } else if (!realView && themeBeforePhotoreal.current !== null) {
       setTheme(themeBeforePhotoreal.current);
       themeBeforePhotoreal.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photoreal]);
+  }, [photoreal, realistic !== null]);
   const [tourOpen, setTourOpen] = useState(false);
   const [drone, setDrone] = useState(false);
   const [droneCtl, setDroneCtl] = useState<DroneController>();
@@ -146,7 +156,9 @@ export default function App() {
       ...o,
       attribution: () => {
         const p = photorealRef.current;
-        return p.state === 'on' ? `Google${p.credits ? ` · ${p.credits}` : ''}` : '© OpenStreetMap · OpenFreeMap · Ajuntament de València';
+        if (p.state === 'on') return `Google${p.credits ? ` · ${p.credits}` : ''}`;
+        if (realisticRef.current) return 'Ortofoto PNOA © IGN · Edificios © OpenStreetMap · Arbolado © Ajuntament de València';
+        return '© OpenStreetMap · OpenFreeMap · Ajuntament de València';
       },
       onFrame: (frame, t, total) => setTourRun((r) => (r ? { ...r, frame, t, total } : r)),
       onStatus: (status) => setTourRun((r) => (r ? { ...r, status } : r)),
@@ -228,11 +240,18 @@ export default function App() {
         camera={camera}
         busColorMode={busMode}
         photorealCred={photoreal && activeCred ? activeCred : null}
+        realistic={realistic}
+        onRealistic={setRealisticStatus}
         onPhotoreal={(st) => {
           setPhotorealState(st);
           if (st.state === 'error') setPhotoreal(false);
         }}
       />
+      {realistic && (
+        <div className="google-attrib realistic-attrib" aria-label="Fuentes de la ciudad realista">
+          <span>Ortofoto PNOA © IGN · Edificios © OpenStreetMap · Arbolado © Ajuntament de València</span>
+        </div>
+      )}
       {photoreal && photorealState.state === 'on' && (
         <div className="google-attrib" aria-label="Atribución de Google">
           <strong>Google</strong>
@@ -250,14 +269,13 @@ export default function App() {
         onTour={() => setTourOpen((v) => !v)}
         drone={drone}
         onDrone={setDrone}
-        photoreal={photoreal}
+        photoreal={realistic !== null || photoreal}
         onPhotoreal={() => {
-          if (activeCred) {
-            setPhotoreal((v) => !v);
-            setPhotorealState({ state: photoreal ? 'off' : 'loading' });
+          if (photoreal) {
+            setPhotoreal(false);
+            setPhotorealState({ state: 'off' });
           } else {
-            setTab('layers');
-            setCollapsed(false);
+            setRealistic((r) => (r ? null : { hour: null, shadows: perf.profile !== 'bajo' }));
           }
         }}
       />
@@ -341,6 +359,12 @@ export default function App() {
               onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
               header={
                 <>
+                <RealisticPanel
+                  options={realistic}
+                  status={realisticStatus}
+                  onChange={setRealistic}
+                  defaultShadows={perf.profile !== 'bajo'}
+                />
                 <PhotorealPanel
                   enabled={photoreal}
                   state={photorealState}

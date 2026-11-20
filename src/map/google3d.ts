@@ -95,9 +95,9 @@ async function checkKey(key: string): Promise<void> {
 const OWN_BASE_LAYERS = ['vlc-buildings', 'vlc-ortho', 'vlc-districts-fill', 'vlc-air-halo'];
 const isBaseLayer = (id: string) => !id.startsWith('vlc-') || OWN_BASE_LAYERS.includes(id);
 
-export function setBaseMapVisible(map: MlMap, visible: boolean, restore: Map<string, string>) {
+export function setBaseMapVisible(map: MlMap, visible: boolean, restore: Map<string, string>, keep: (id: string) => boolean = () => false) {
   for (const l of map.getStyle().layers ?? []) {
-    if (!isBaseLayer(l.id)) continue;
+    if (!isBaseLayer(l.id) || keep(l.id)) continue;
     if (!visible) {
       restore.set(l.id, (map.getLayoutProperty(l.id, 'visibility') as string) ?? 'visible');
       map.setLayoutProperty(l.id, 'visibility', 'none');

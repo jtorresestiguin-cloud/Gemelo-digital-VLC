@@ -11,7 +11,8 @@ import {
   addTransitLayers, busesFrame, highlightLine, routesGeo, setBusColorMode, stopsGeo, themeTransit, type BusColorMode,
 } from './transit';
 import type { BusTrack } from '../core/types';
-import { enablePhotoreal, type PhotorealCredential, type PhotorealState } from './google3d';
+import { enablePhotoreal, setBaseMapVisible, type PhotorealCredential, type PhotorealState } from './google3d';
+import type { RealisticOptions, RealisticStatus } from '../realistic/RealisticLayer';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import {
@@ -233,12 +234,15 @@ interface Props {
   /** credencial para la vista fotorrealista; null = desactivada */
   photorealCred: PhotorealCredential | null;
   onPhotoreal: (s: PhotorealState) => void;
+  /** modo realista sin cuentas (ortofoto + edificios + árboles); null = desactivado */
+  realistic: RealisticOptions | null;
+  onRealistic: (s: RealisticStatus | null) => void;
   /** la cámara gira lentamente alrededor del centro */
   orbit: boolean;
   camera?: { preset: CameraPreset; seq: number };
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealCred, onPhotoreal }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealCred, onPhotoreal, realistic, onRealistic }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -375,11 +379,45 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     if (!ready || !map) return;
     for (const [key, ids] of Object.entries(LAYER_GROUPS) as [LayerKey, string[]][]) {
       // con la vista fotorrealista, Google ya aporta edificios e imagen: no se muestran los propios
-      const hiddenByPhotoreal = photorealOn.current && (key === 'buildings' || key === 'ortho');
+      const hiddenByPhotoreal = (photorealOn.current || realisticLayer.current !== null) && (key === 'buildings' || key === 'ortho');
       for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers[key] && !hiddenByPhotoreal ? 'visible' : 'none');
     }
-    if (!photorealOn.current) map.setTerrain(layers.terrain ? { source: 'vlc-terrain', exaggeration: 1.5 } : null);
+    if (!photorealOn.current && !realisticLayer.current) map.setTerrain(layers.terrain ? { source: 'vlc-terrain', exaggeration: 1.5 } : null);
   }, [layers, ready]);
+
+  // Modo realista sin cuentas (three.js se descarga solo al activarlo)
+  const realisticLayer = useRef<import('../realistic/RealisticLayer').RealisticLayer | null>(null);
+  const realisticOn = realistic !== null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !realisticOn) return;
+    let cancelled = false;
+    const restore = new Map<string, string>();
+    const hadTerrain = !!map.getTerrain();
+    const bg = map.getLayer('background') ? map.getPaintProperty('background', 'background-color') : undefined;
+    import('../realistic/RealisticLayer').then(({ RealisticLayer }) => {
+      if (cancelled) return;
+      map.setTerrain(null);
+      setBaseMapVisible(map, false, restore, (id) => id === 'background');
+      const layer = new RealisticLayer(realistic!, onRealistic);
+      realisticLayer.current = layer;
+      map.addLayer(layer, map.getLayer('vlc-districts-fill') ? 'vlc-districts-fill' : undefined);
+    }).catch((e: unknown) => onRealistic({ buildings: 0, trees: 0, loading: false, error: String(e) }));
+    return () => {
+      cancelled = true;
+      if (map.getLayer('vlc-realistic')) map.removeLayer('vlc-realistic');
+      realisticLayer.current = null;
+      setBaseMapVisible(map, true, restore);
+      if (bg !== undefined && map.getLayer('background')) map.setPaintProperty('background', 'background-color', bg);
+      if (hadTerrain) map.setTerrain({ source: 'vlc-terrain', exaggeration: 1.5 });
+      applyTheme(map, themeRef.current);
+      onRealistic(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realisticOn, ready]);
+  useEffect(() => {
+    if (realistic) realisticLayer.current?.setOptions(realistic);
+  }, [realistic?.hour, realistic?.shadows]);
 
   // Vista fotorrealista de Google (deck.gl se descarga solo al activarla)
   useEffect(() => {
@@ -442,6 +480,8 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     if (ready && mapRef.current) {
       applyTheme(mapRef.current, theme);
       themeTransit(mapRef.current, theme);
+      // el modo realista controla su propio cielo según la hora del sol
+      if (realistic) realisticLayer.current?.setOptions(realistic);
     }
   }, [theme, ready]);
 

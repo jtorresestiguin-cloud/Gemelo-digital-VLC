@@ -57,7 +57,15 @@ la ciudad en 3D.
   se resalta su línea.
 - **Estética y cámara**: mapa en **modo noche** (por defecto) o día, atajos **«Ir a…»**,
   **girar alrededor** y **modo grabación** (tecla R) que deja solo el mapa para grabar vídeos.
-- **Ciudad fotorrealista 3D** (botón *🌍 Realista*): los «Photorealistic 3D Tiles» de
+- **Ciudad realista 3D sin cuentas** (botón *🌍 Realista*): render con three.js dentro del
+  mapa usando solo datos abiertos que no piden registro: **ortofoto PNOA del IGN** (hasta
+  ~15 cm/píxel) proyectada sobre el suelo y los tejados, edificios de OpenStreetMap con su
+  altura y fachadas con ventanas por planta (con nivel de detalle según la distancia),
+  los **158.000 árboles del inventario municipal** (con su altura, copa y tipo: palmeras,
+  coníferas, frondosas), **sol en su posición real** según la hora en València (con
+  amanecer/atardecer reales del día), cielo, niebla de distancia, **sombras** y ventanas
+  iluminadas de noche. Compatible con el modo dron, la visita guiada y la grabación.
+- **Fotogrametría de Google (opcional, con cuenta)**: los «Photorealistic 3D Tiles» de
   Google (fotogrametría aérea), dibujados con deck.gl dentro del mapa y con los datos del
   gemelo encima; pasa a modo día y oculta el mapa base. Se obtienen con un token gratuito de
   Cesium ion o con una clave de Google (ver *Vista fotorrealista* más abajo).
