@@ -60,6 +60,12 @@ la ciudad en 3D.
 - **Vista fotorrealista 3D (Google)**: la ciudad con los «Photorealistic 3D Tiles» de
   Google (fotogrametría aérea), dibujados con deck.gl dentro del mapa y con los datos del
   gemelo encima. Requiere una clave propia (ver *Vista fotorrealista* más abajo).
+- **Recorrido aéreo cinematográfico** (botón *✈ Recorrido*): vuelo por los hitos de la ciudad
+  (Torres de Serrans, Micalet, Llotja, Estació del Nord, Túria, Ciutat de les Arts, Port…)
+  con rótulos, que se puede ver en directo o **grabar a vídeo** (MP4 H.264 o WebM, 720p/1080p)
+  con **música generada en el navegador** y las atribuciones incrustadas. Incluye recorridos
+  generados con los datos (hospitales públicos, mercados, museos) y admite guiones propios en
+  JSON (`src/tour/tours.ts` documenta el formato): se pueden escribir a mano o pedírselos a Claude.
 - **Los 19 distritos** con sus límites oficiales (portal de datos abiertos) coloreados según la
   peor alerta activa. Los elementos se asignan a su distrito por punto-en-polígono; si el
   servicio no responde, se usan polígonos aproximados (Voronoi de los centroides).

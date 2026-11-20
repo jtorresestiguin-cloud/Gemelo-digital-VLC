@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { CityRuntime } from './core/runtime';
 import { detectPerformance } from './core/device';
 import type { LngLat } from './core/types';
@@ -16,6 +16,10 @@ import { TransitPanel } from './ui/TransitPanel';
 import type { BusColorMode } from './map/transit';
 import { PhotorealPanel } from './ui/PhotorealPanel';
 import type { PhotorealState } from './map/google3d';
+import { TourPanel } from './ui/TourPanel';
+import { playTour, type TourHandle } from './tour/player';
+import type { Tour } from './tour/tours';
+import type { TourFrame } from './tour/camera';
 
 const BUILD_GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || undefined;
 import type { MapTheme } from './map/theme';
@@ -68,6 +72,35 @@ export default function App() {
   const [photoreal, setPhotoreal] = useState(false);
   const [photorealState, setPhotorealState] = useState<PhotorealState>({ state: 'off' });
   const activeGoogleKey = BUILD_GOOGLE_KEY || googleKey;
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourRun, setTourRun] = useState<{ tour: Tour; handle: TourHandle; record: boolean; frame?: TourFrame; t: number; total: number; status?: string }>();
+  const [videoUrl, setVideoUrl] = useState<{ url: string; name: string }>();
+  const photorealRef = useRef(photorealState);
+  photorealRef.current = photorealState;
+
+  const startTour = (tour: Tour, o: { record: boolean; music: boolean; quality: '720p' | '1080p' }) => {
+    if (!map) return;
+    setTourOpen(false);
+    setOrbit(false);
+    setVideoUrl(undefined);
+    const handle = playTour(map, tour, {
+      ...o,
+      attribution: () => {
+        const p = photorealRef.current;
+        return p.state === 'on' ? `Google${p.credits ? ` · ${p.credits}` : ''}` : '© OpenStreetMap · OpenFreeMap · Ajuntament de València';
+      },
+      onFrame: (frame, t, total) => setTourRun((r) => (r ? { ...r, frame, t, total } : r)),
+      onStatus: (status) => setTourRun((r) => (r ? { ...r, status } : r)),
+    });
+    setTourRun({ tour, handle, record: o.record, t: 0, total: 0 });
+    handle.done.then((video) => {
+      setTourRun(undefined);
+      if (video) {
+        const date = new Date().toISOString().slice(0, 10);
+        setVideoUrl({ url: URL.createObjectURL(video.blob), name: `gemelo-valencia-${tour.id}-${date}.${video.extension}` });
+      }
+    });
+  };
 
   useEffect(() => writePref('vlc-theme', theme), [theme]);
 
@@ -107,7 +140,7 @@ export default function App() {
   ];
 
   return (
-    <div className={`app ${recording ? 'recording' : ''}`} data-theme={theme}>
+    <div className={`app ${recording || tourRun ? 'recording' : ''}`} data-theme={theme}>
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>▮▮▮</span>
@@ -155,7 +188,46 @@ export default function App() {
         onOrbit={setOrbit}
         onGo={(preset) => setCamera({ preset, seq: Date.now() })}
         onRecord={() => setRecording(true)}
+        onTour={() => setTourOpen((v) => !v)}
       />
+      {tourOpen && !tourRun && (
+        <TourPanel
+          services={snapshot.state.services}
+          photoreal={photorealState.state === 'on'}
+          onPlay={startTour}
+          onClose={() => setTourOpen(false)}
+        />
+      )}
+      {tourRun && (() => {
+        const f = tourRun.frame;
+        const stop = f ? tourRun.tour.stops[f.stopIndex] : undefined;
+        const p = f?.holdProgress ?? 0;
+        const last = f?.stopIndex === tourRun.tour.stops.length - 1;
+        const alpha = Math.min(1, p * 4, (1 - p) * 4 + (last ? 1 : 0));
+        return (
+          <>
+            {stop && !tourRun.status && (
+              <div className="tour-title" style={{ opacity: alpha }}>
+                <i />
+                <strong>{stop.name}</strong>
+                {stop.subtitle && <span>{stop.subtitle}</span>}
+              </div>
+            )}
+            <div className="tour-bar">
+              {tourRun.record && <span className="rec">● REC</span>}
+              <span>{tourRun.status || `${tourRun.tour.title} · ${Math.floor(tourRun.t)} / ${Math.round(tourRun.total)} s`}</span>
+              <progress max={tourRun.total || 1} value={tourRun.t} />
+              <button onClick={() => tourRun.handle.stop()}>■ Detener</button>
+            </div>
+          </>
+        );
+      })()}
+      {videoUrl && (
+        <div className="toast video-ready">
+          Vídeo listo · <a href={videoUrl.url} download={videoUrl.name}>Descargar {videoUrl.name.split('.').pop()?.toUpperCase()}</a>
+          <button className="link" onClick={() => setVideoUrl(undefined)}>✕</button>
+        </div>
+      )}
       {recording && (
         <button className="record-exit" onClick={() => setRecording(false)}>Modo grabación · pulsa R o Esc para salir</button>
       )}
