@@ -8,7 +8,7 @@ const OUT = 'capturas';
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const stats = { tiles: 0, tileErrors: 0, ion: 0, errors: [] };
 page.on('response', (r) => {
   const u = r.url();
@@ -23,7 +23,15 @@ await page.waitForTimeout(4000);
 // modo grabación fuera: interesa ver la interfaz en la primera captura
 await page.click('.toolbar-actions >> text=Realista');
 await page.waitForTimeout(25_000);
-await page.screenshot({ path: `${OUT}/01-inicio.png` });
+const shot = async (file) => {
+  try {
+    await page.screenshot({ path: `${OUT}/${file}`, timeout: 180_000 });
+    console.log('captura', file);
+  } catch (e) {
+    console.log('sin captura', file, e.message.split('\n')[0]);
+  }
+};
+await shot('01-inicio.png');
 console.log('Estado del panel:', await page.locator('.photoreal .error').innerText().catch(() => 'sin errores'));
 
 for (const [name, label] of [['02-centro', 'Centro'], ['03-ciutat-arts', 'Ciutat de les Arts'], ['04-port', 'Port']]) {
@@ -31,7 +39,7 @@ for (const [name, label] of [['02-centro', 'Centro'], ['03-ciutat-arts', 'Ciutat
   await page.waitForTimeout(30_000);
   await page.keyboard.press('r'); // solo el mapa
   await page.waitForTimeout(1000);
-  await page.screenshot({ path: `${OUT}/${name}.png` });
+  await shot(`${name}.png`);
   await page.keyboard.press('r');
 }
 writeFileSync(`${OUT}/stats.json`, JSON.stringify(stats, null, 2));
