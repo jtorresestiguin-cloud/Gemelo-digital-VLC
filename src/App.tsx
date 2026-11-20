@@ -65,6 +65,9 @@ const runtime = new CityRuntime();
  * código y se recupera poniendo SIMPLE = false.
  */
 const SIMPLE = true;
+
+/** Pantalla de móvil (mismo corte que el CSS). */
+const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches;
 type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 
 /** Por defecto el mapa sale limpio: solo los edificios 3D; cada capa se activa desde el panel. */
@@ -83,11 +86,12 @@ export default function App() {
   const [layers, setLayers] = useState(ALL_LAYERS);
   const [focus, setFocus] = useState<{ lngLat: LngLat; seq: number; zoom?: number }>();
   const [baseMapOnline, setBaseMapOnline] = useState<boolean>();
-  const [collapsed, setCollapsed] = useState(false);
+  // en el móvil todo arranca plegado para dejar ver la ciudad
+  const [collapsed, setCollapsed] = useState(isMobile);
   const [showBaseMapToast, setShowBaseMapToast] = useState(true);
   const [map, setMap] = useState<MlMap>();
   const [serviceCats, setServiceCats] = useState<ServiceCategory[]>([]);
-  const [toolbarMin, setToolbarMin] = useState<boolean>(() => readPref('vlc-toolbar-min', false));
+  const [toolbarMin, setToolbarMin] = useState<boolean>(() => readPref('vlc-toolbar-min', isMobile()));
   useEffect(() => writePref('vlc-toolbar-min', toolbarMin), [toolbarMin]);
   const toggleLayer = (k: LayerKey) => {
     setLayers((l) => {
@@ -152,6 +156,7 @@ export default function App() {
 
   const startGuided = (tour: Tour) => {
     if (!map) return;
+    if (isMobile()) setCollapsed(true);
     setTourOpen(false);
     setOrbit(false);
     guided?.ctl.dispose();
@@ -234,7 +239,7 @@ export default function App() {
   ];
 
   return (
-    <div className={`app ${recording || tourRun ? 'recording' : ''} ${guided || drone ? 'flying' : ''}`} data-theme={theme}>
+    <div className={`app ${recording || tourRun ? 'recording' : ''} ${guided || drone ? 'flying' : ''} ${collapsed ? 'sheet-closed' : 'sheet-open'}`} data-theme={theme}>
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>▮▮▮</span>
@@ -292,9 +297,15 @@ export default function App() {
         onOrbit={setOrbit}
         onGo={(preset) => setCamera({ preset, seq: Date.now() })}
         onRecord={() => setRecording(true)}
-        onTour={() => setTourOpen((v) => !v)}
+        onTour={() => {
+          setTourOpen((v) => !v);
+          if (isMobile()) setCollapsed(true);
+        }}
         drone={drone}
-        onDrone={setDrone}
+        onDrone={(on) => {
+          setDrone(on);
+          if (on && isMobile()) setCollapsed(true);
+        }}
         photoreal={realistic !== null || photoreal}
         onPhotoreal={() => {
           if (photoreal) {
@@ -383,6 +394,7 @@ export default function App() {
         </button>
         <div className="panel-handle" onClick={() => setCollapsed((c) => !c)} role="button" aria-label="Mostrar u ocultar panel">
           <span />
+          {SIMPLE && <b className="handle-label">Servicios públicos {collapsed ? '▲' : '▼'}</b>}
         </div>
         {!SIMPLE && <nav className="tabs">
           {tabs.map(([id, label]) => (
