@@ -29,6 +29,8 @@ jobs:
         env:
           # opcional: clave de Google Maps Platform para la vista fotorrealista 3D
           VITE_GOOGLE_MAPS_KEY: ${{ secrets.GOOGLE_MAPS_KEY }}
+          # opcional: token de Cesium ion (alternativa gratuita para los mismos modelos)
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

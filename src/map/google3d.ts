@@ -12,6 +12,47 @@
 import type { Map as MlMap } from 'maplibre-gl';
 
 export const GOOGLE_3D_ROOT = 'https://tile.googleapis.com/v1/3dtiles/root.json';
+/** «Google Photorealistic 3D Tiles» en el catálogo de Cesium ion (Asset Depot). */
+export const ION_GOOGLE_ASSET = 2275207;
+export const ION_API = 'https://api.cesium.com/v1/assets';
+
+/** Credencial para los modelos fotorrealistas: clave de Google o token de Cesium ion. */
+export type PhotorealCredential = { provider: 'google'; key: string } | { provider: 'ion'; token: string };
+
+interface IonEndpoint {
+  type?: string;
+  url?: string;
+  accessToken?: string;
+  externalType?: string;
+  options?: { url?: string };
+}
+
+/**
+ * Traduce la respuesta de Cesium ion a la URL del tileset. Para los modelos de Google, ion
+ * devuelve un recurso externo con la URL de Google ya autorizada (externalType 3DTILES).
+ */
+export function tilesetFromIonEndpoint(e: IonEndpoint): string {
+  if (e.externalType === '3DTILES' && e.options?.url) return e.options.url;
+  if (e.type === '3DTILES' && e.url) {
+    const u = new URL(e.url);
+    if (e.accessToken) u.searchParams.set('access_token', e.accessToken);
+    return u.toString();
+  }
+  throw new Error('El recurso de Cesium ion no es un conjunto 3D Tiles.');
+}
+
+export function ionErrorMessage(status: number): string {
+  if (status === 401) return 'El token de Cesium ion no es válido.';
+  if (status === 404) return 'Tu cuenta de Cesium ion no tiene «Google Photorealistic 3D Tiles»: añádelo desde Asset Depot a «My Assets».';
+  if (status === 403) return 'El token de Cesium ion no tiene acceso a ese recurso (revisa sus permisos y dominios permitidos).';
+  return `Cesium ion respondió HTTP ${status}.`;
+}
+
+async function resolveIon(token: string): Promise<string> {
+  const r = await fetch(`${ION_API}/${ION_GOOGLE_ASSET}/endpoint`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(ionErrorMessage(r.status));
+  return tilesetFromIonEndpoint(await r.json());
+}
 
 export type PhotorealState =
   | { state: 'off' }
@@ -51,7 +92,7 @@ async function checkKey(key: string): Promise<void> {
 }
 
 /** Capas propias que se ocultan junto con el mapa base (los modelos de Google ya los incluyen). */
-const OWN_BASE_LAYERS = ['vlc-buildings', 'vlc-ortho'];
+const OWN_BASE_LAYERS = ['vlc-buildings', 'vlc-ortho', 'vlc-districts-fill', 'vlc-air-halo'];
 const isBaseLayer = (id: string) => !id.startsWith('vlc-') || OWN_BASE_LAYERS.includes(id);
 
 export function setBaseMapVisible(map: MlMap, visible: boolean, restore: Map<string, string>) {
@@ -71,9 +112,16 @@ export function setBaseMapVisible(map: MlMap, visible: boolean, restore: Map<str
  * Activa la vista fotorrealista. Devuelve una función para desactivarla.
  * deck.gl (≈1 MB) solo se descarga al activarla.
  */
-export async function enablePhotoreal(map: MlMap, key: string, onState: (s: PhotorealState) => void): Promise<() => void> {
+export async function enablePhotoreal(map: MlMap, cred: PhotorealCredential, onState: (s: PhotorealState) => void): Promise<() => void> {
   onState({ state: 'loading' });
-  await checkKey(key);
+  let data = GOOGLE_3D_ROOT;
+  let loadOptions: Record<string, unknown> = {};
+  if (cred.provider === 'google') {
+    await checkKey(cred.key);
+    loadOptions = { fetch: { headers: { 'X-GoogleMaps-Api-Key': cred.key } } };
+  } else {
+    data = await resolveIon(cred.token);
+  }
   const [{ MapboxOverlay }, { Tile3DLayer }] = await Promise.all([import('@deck.gl/mapbox'), import('@deck.gl/geo-layers')]);
 
   const restore = new Map<string, string>();
@@ -87,8 +135,8 @@ export async function enablePhotoreal(map: MlMap, key: string, onState: (s: Phot
     layers: [
       new Tile3DLayer({
         id: 'google-photoreal-3d',
-        data: GOOGLE_3D_ROOT,
-        loadOptions: { fetch: { headers: { 'X-GoogleMaps-Api-Key': key } } },
+        data,
+        loadOptions,
         // por debajo de los datos del gemelo (distritos, tráfico, autobuses…)
         beforeId: map.getLayer('vlc-districts-fill') ? 'vlc-districts-fill' : undefined,
         onTilesetLoad: (tileset: { options: { onTraversalComplete?: (t: unknown[]) => unknown[] } }) => {

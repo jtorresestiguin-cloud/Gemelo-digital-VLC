@@ -15,7 +15,7 @@ import { MapToolbar } from './ui/MapToolbar';
 import { TransitPanel } from './ui/TransitPanel';
 import type { BusColorMode } from './map/transit';
 import { PhotorealPanel } from './ui/PhotorealPanel';
-import type { PhotorealState } from './map/google3d';
+import type { PhotorealCredential, PhotorealState } from './map/google3d';
 import { TourPanel } from './ui/TourPanel';
 import { DroneHelp, GuidedCard } from './ui/FlightOverlays';
 import { DroneController } from './map/drone';
@@ -24,7 +24,19 @@ import { playTour, type TourHandle } from './tour/player';
 import type { Tour } from './tour/tours';
 import type { TourFrame } from './tour/camera';
 
-const BUILD_GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || undefined;
+const BUILD_CRED: PhotorealCredential | undefined = import.meta.env.VITE_CESIUM_ION_TOKEN
+  ? { provider: 'ion', token: import.meta.env.VITE_CESIUM_ION_TOKEN }
+  : import.meta.env.VITE_GOOGLE_MAPS_KEY
+    ? { provider: 'google', key: import.meta.env.VITE_GOOGLE_MAPS_KEY }
+    : undefined;
+
+/** Credencial guardada en este navegador (con compatibilidad con la clave de Google anterior). */
+function readSavedCred(): PhotorealCredential | undefined {
+  const c = readPref<PhotorealCredential | undefined>('vlc-photoreal-cred', undefined);
+  if (c) return c;
+  const legacy = readPref<string | undefined>('vlc-google-key', undefined);
+  return legacy ? { provider: 'google', key: legacy } : undefined;
+}
 import type { MapTheme } from './map/theme';
 
 const readPref = <T,>(key: string, fallback: T): T => {
@@ -71,10 +83,22 @@ export default function App() {
   const [camera, setCamera] = useState<{ preset: CameraPreset; seq: number }>();
   const [recording, setRecording] = useState(false);
   const [busMode, setBusMode] = useState<BusColorMode>('movement');
-  const [googleKey, setGoogleKey] = useState<string | undefined>(() => readPref<string | undefined>('vlc-google-key', undefined));
+  const [savedCred, setSavedCred] = useState<PhotorealCredential | undefined>(readSavedCred);
   const [photoreal, setPhotoreal] = useState(false);
   const [photorealState, setPhotorealState] = useState<PhotorealState>({ state: 'off' });
-  const activeGoogleKey = BUILD_GOOGLE_KEY || googleKey;
+  const activeCred = BUILD_CRED ?? savedCred;
+  // la ciudad fotorrealista se ve de día (como una foto); al salir se recupera el tema anterior
+  const themeBeforePhotoreal = useRef<MapTheme | null>(null);
+  useEffect(() => {
+    if (photoreal && themeBeforePhotoreal.current === null) {
+      themeBeforePhotoreal.current = theme;
+      setTheme('day');
+    } else if (!photoreal && themeBeforePhotoreal.current !== null) {
+      setTheme(themeBeforePhotoreal.current);
+      themeBeforePhotoreal.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoreal]);
   const [tourOpen, setTourOpen] = useState(false);
   const [drone, setDrone] = useState(false);
   const [droneCtl, setDroneCtl] = useState<DroneController>();
@@ -203,7 +227,7 @@ export default function App() {
         orbit={orbit}
         camera={camera}
         busColorMode={busMode}
-        photorealKey={photoreal && activeGoogleKey ? activeGoogleKey : null}
+        photorealCred={photoreal && activeCred ? activeCred : null}
         onPhotoreal={(st) => {
           setPhotorealState(st);
           if (st.state === 'error') setPhotoreal(false);
@@ -226,6 +250,16 @@ export default function App() {
         onTour={() => setTourOpen((v) => !v)}
         drone={drone}
         onDrone={setDrone}
+        photoreal={photoreal}
+        onPhotoreal={() => {
+          if (activeCred) {
+            setPhotoreal((v) => !v);
+            setPhotorealState({ state: photoreal ? 'off' : 'loading' });
+          } else {
+            setTab('layers');
+            setCollapsed(false);
+          }
+        }}
       />
       {guided && !tourRun && (
         <GuidedCard
@@ -307,6 +341,21 @@ export default function App() {
               onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
               header={
                 <>
+                <PhotorealPanel
+                  enabled={photoreal}
+                  state={photorealState}
+                  buildCred={BUILD_CRED}
+                  savedCred={savedCred}
+                  onSaveCred={(c) => {
+                    setSavedCred(c);
+                    if (c) writePref('vlc-photoreal-cred', c);
+                    else try { localStorage.removeItem('vlc-photoreal-cred'); localStorage.removeItem('vlc-google-key'); } catch { /* sin almacenamiento */ }
+                  }}
+                  onToggle={(on) => {
+                    setPhotoreal(on);
+                    if (on) setPhotorealState({ state: 'loading' });
+                  }}
+                />
                 <TransitPanel
                   buses={snapshot.state.buses}
                   routes={snapshot.state.busRoutes.length}
@@ -317,21 +366,6 @@ export default function App() {
                   onMode={setBusMode}
                   layers={layers}
                   onToggle={(k) => setLayers((l) => ({ ...l, [k]: !l[k] }))}
-                />
-                <PhotorealPanel
-                  enabled={photoreal}
-                  state={photorealState}
-                  buildKey={BUILD_GOOGLE_KEY}
-                  savedKey={googleKey}
-                  onSaveKey={(k) => {
-                    setGoogleKey(k);
-                    if (k) writePref('vlc-google-key', k);
-                    else try { localStorage.removeItem('vlc-google-key'); } catch { /* sin almacenamiento */ }
-                  }}
-                  onToggle={(on) => {
-                    setPhotoreal(on);
-                    if (on) setPhotorealState({ state: 'loading' });
-                  }}
                 />
                 <ServicesPanel
                   services={snapshot.state.services}

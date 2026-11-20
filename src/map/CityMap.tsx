@@ -11,7 +11,7 @@ import {
   addTransitLayers, busesFrame, highlightLine, routesGeo, setBusColorMode, stopsGeo, themeTransit, type BusColorMode,
 } from './transit';
 import type { BusTrack } from '../core/types';
-import { enablePhotoreal, type PhotorealState } from './google3d';
+import { enablePhotoreal, type PhotorealCredential, type PhotorealState } from './google3d';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import {
@@ -230,15 +230,15 @@ interface Props {
   serviceCategories: ServiceCategory[];
   theme: MapTheme;
   busColorMode: BusColorMode;
-  /** clave de Google para la vista fotorrealista; null = desactivada */
-  photorealKey: string | null;
+  /** credencial para la vista fotorrealista; null = desactivada */
+  photorealCred: PhotorealCredential | null;
   onPhotoreal: (s: PhotorealState) => void;
   /** la cámara gira lentamente alrededor del centro */
   orbit: boolean;
   camera?: { preset: CameraPreset; seq: number };
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealKey, onPhotoreal }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealCred, onPhotoreal }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -384,11 +384,11 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
   // Vista fotorrealista de Google (deck.gl se descarga solo al activarla)
   useEffect(() => {
     const map = mapRef.current;
-    if (!ready || !map || !photorealKey) return;
+    if (!ready || !map || !photorealCred) return;
     let dispose: (() => void) | undefined;
     let cancelled = false;
     photorealOn.current = true;
-    enablePhotoreal(map, photorealKey, onPhotoreal)
+    enablePhotoreal(map, photorealCred, onPhotoreal)
       .then((d) => {
         if (cancelled) d();
         else dispose = d;
@@ -403,7 +403,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
       dispose?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photorealKey, ready]);
+  }, [photorealCred, ready]);
 
   // Modelo BIM (three.js se carga solo si hay modelo)
   const bimLayer = useRef<import('../bim/BimLayer').BimLayer | null>(null);

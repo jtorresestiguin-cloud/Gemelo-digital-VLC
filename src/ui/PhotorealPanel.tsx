@@ -1,61 +1,79 @@
 import { useState } from 'react';
-import type { PhotorealState } from '../map/google3d';
+import type { PhotorealCredential, PhotorealState } from '../map/google3d';
 
 interface Props {
   enabled: boolean;
   state: PhotorealState;
-  /** clave inyectada al compilar (secreto del repositorio) */
-  buildKey?: string;
-  savedKey?: string;
-  onSaveKey: (k: string | undefined) => void;
+  /** credencial inyectada al compilar (secreto del repositorio) */
+  buildCred?: PhotorealCredential;
+  savedCred?: PhotorealCredential;
+  onSaveCred: (c: PhotorealCredential | undefined) => void;
   onToggle: (on: boolean) => void;
 }
 
-export function PhotorealPanel({ enabled, state, buildKey, savedKey, onSaveKey, onToggle }: Props) {
+type Provider = PhotorealCredential['provider'];
+
+export function PhotorealPanel({ enabled, state, buildCred, savedCred, onSaveCred, onToggle }: Props) {
+  const [provider, setProvider] = useState<Provider>('ion');
   const [draft, setDraft] = useState('');
-  const key = buildKey || savedKey;
+  const cred = buildCred ?? savedCred;
+  const save = () => {
+    onSaveCred(provider === 'ion' ? { provider: 'ion', token: draft } : { provider: 'google', key: draft });
+    setDraft('');
+    onToggle(true);
+  };
   return (
     <div className="photoreal">
-      <h4>Vista fotorrealista 3D (Google)</h4>
+      <h4>Ciudad fotorrealista 3D</h4>
       <p className="muted small">
-        Ciudad en 3D fotorrealista (fotogrametría aérea de Google) con los datos del gemelo encima.
-        Mientras está activa se oculta el mapa base de OpenStreetMap, como exigen las condiciones de Google.
+        Los modelos 3D fotorrealistas de Google (fotogrametría aérea: fachadas, árboles, barcos…), los mismos del vídeo
+        de Palma. Encima se mantienen los datos del gemelo y se puede volar con el dron o la visita guiada.
       </p>
-      {!key && (
+      {!cred && (
         <>
-          <div className="row">
-            <input
-              className="search"
-              type="password"
-              autoComplete="off"
-              placeholder="Clave de Google Maps Platform (Map Tiles API)"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value.trim())}
-            />
+          <div className="seg" role="group" aria-label="Proveedor">
+            <button className={provider === 'ion' ? 'active' : ''} onClick={() => setProvider('ion')}>Cesium ion (gratis)</button>
+            <button className={provider === 'google' ? 'active' : ''} onClick={() => setProvider('google')}>Clave de Google</button>
           </div>
-          <div className="row">
-            <button className="file-btn" disabled={draft.length < 20} onClick={() => { onSaveKey(draft); setDraft(''); onToggle(true); }}>
-              Guardar y activar
-            </button>
-          </div>
-          <p className="muted small">
-            La clave se guarda solo en este navegador. Para que funcione para todos, guárdala como secreto
-            <code> GOOGLE_MAPS_KEY</code> del repositorio (ver README).
-          </p>
+          {provider === 'ion' ? (
+            <ol className="steps small">
+              <li>Crea una cuenta gratuita en <a href="https://ion.cesium.com/signup" target="_blank" rel="noopener">ion.cesium.com</a> (no pide tarjeta).</li>
+              <li>En <em>Asset Depot</em>, busca «Google Photorealistic 3D Tiles» y pulsa <em>Add to my assets</em>.</li>
+              <li>En <em>Access Tokens</em>, copia el <em>Default Token</em> (o crea uno) y pégalo aquí.</li>
+            </ol>
+          ) : (
+            <ol className="steps small">
+              <li>En Google Cloud, activa la facturación y la <em>Map Tiles API</em>.</li>
+              <li>Crea una clave de API restringida a este dominio y a la Map Tiles API.</li>
+              <li>Pégala aquí (detalles en el README).</li>
+            </ol>
+          )}
+          <input
+            className="search"
+            type="password"
+            autoComplete="off"
+            placeholder={provider === 'ion' ? 'Token de acceso de Cesium ion' : 'Clave de Google Maps Platform'}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.trim())}
+          />
+          <button className="file-btn big-action" disabled={draft.length < 20} onClick={save}>Guardar y ver la ciudad fotorrealista</button>
+          <p className="muted small">Se guarda solo en este navegador. Para que la vean todos los visitantes, guárdalo como secreto del repositorio (ver README).</p>
         </>
       )}
-      {key && (
-        <label className="switch">
-          <span>Activar vista fotorrealista</span>
-          <input type="checkbox" checked={enabled} onChange={() => onToggle(!enabled)} />
-          <i aria-hidden />
-        </label>
+      {cred && (
+        <>
+          <label className="switch">
+            <span>Ciudad fotorrealista ({cred.provider === 'ion' ? 'Cesium ion' : 'Google'})</span>
+            <input type="checkbox" checked={enabled} onChange={() => onToggle(!enabled)} />
+            <i aria-hidden />
+          </label>
+          {!buildCred && (
+            <button className="link" onClick={() => { onToggle(false); onSaveCred(undefined); }}>Olvidar la credencial de este navegador</button>
+          )}
+        </>
       )}
-      {enabled && state.state === 'loading' && <p className="muted small">Comprobando la clave y cargando los modelos 3D…</p>}
+      {enabled && state.state === 'loading' && <p className="muted small">Cargando los modelos 3D…</p>}
       {state.state === 'error' && <p className="error small">{state.message}</p>}
-      {key && !buildKey && (
-        <button className="link" onClick={() => { onToggle(false); onSaveKey(undefined); }}>Olvidar la clave de este navegador</button>
-      )}
     </div>
   );
 }

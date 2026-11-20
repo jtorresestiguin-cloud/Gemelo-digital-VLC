@@ -11,10 +11,12 @@ interface Props {
   onTour: () => void;
   drone: boolean;
   onDrone: (on: boolean) => void;
+  photoreal: boolean;
+  onPhotoreal: () => void;
 }
 
 /** Barra inferior del mapa: atajos de cámara, tema, giro y modo grabación. */
-export function MapToolbar({ theme, orbit, onTheme, onOrbit, onGo, onRecord, onTour, drone, onDrone }: Props) {
+export function MapToolbar({ theme, orbit, onTheme, onOrbit, onGo, onRecord, onTour, drone, onDrone, photoreal, onPhotoreal }: Props) {
   return (
     <div className="map-toolbar">
       <div className="goto" role="group" aria-label="Ir a">
@@ -30,6 +32,7 @@ export function MapToolbar({ theme, orbit, onTheme, onOrbit, onGo, onRecord, onT
         <button className={orbit ? 'on' : ''} onClick={() => onOrbit(!orbit)} title="La cámara gira lentamente alrededor de la ciudad">
           ⟳ Girar
         </button>
+        <button className={photoreal ? 'on' : ''} onClick={onPhotoreal} title="Ciudad fotorrealista 3D (modelos de Google)">🌍 Realista</button>
         <button className={drone ? 'on' : ''} onClick={() => onDrone(!drone)} title="Vuela libremente: W A S D, Q/E, flechas, Mayús">🛩 Dron</button>
         <button onClick={onTour} title="Vuelo cinematográfico por la ciudad, en directo o grabado a vídeo">✈ Recorrido</button>
         <button onClick={onRecord} title="Oculta los paneles y deja solo el mapa (tecla R)">◻ Solo mapa</button>

@@ -57,9 +57,10 @@ la ciudad en 3D.
   se resalta su línea.
 - **Estética y cámara**: mapa en **modo noche** (por defecto) o día, atajos **«Ir a…»**,
   **girar alrededor** y **modo grabación** (tecla R) que deja solo el mapa para grabar vídeos.
-- **Vista fotorrealista 3D (Google)**: la ciudad con los «Photorealistic 3D Tiles» de
+- **Ciudad fotorrealista 3D** (botón *🌍 Realista*): los «Photorealistic 3D Tiles» de
   Google (fotogrametría aérea), dibujados con deck.gl dentro del mapa y con los datos del
-  gemelo encima. Requiere una clave propia (ver *Vista fotorrealista* más abajo).
+  gemelo encima; pasa a modo día y oculta el mapa base. Se obtienen con un token gratuito de
+  Cesium ion o con una clave de Google (ver *Vista fotorrealista* más abajo).
 - **Volar por la ciudad 3D**:
   - **Modo dron** (botón *🛩 Dron*): vuelo libre con teclado (W/S avanzar, A/D lateral,
     Q/E bajar/subir, flechas para girar y mirar al horizonte, Mayús rápido) o con botones
@@ -135,6 +136,16 @@ También funciona tal cual en Cloudflare Pages, Netlify o Vercel (comando `npm r
 directorio `dist`).
 
 ## Vista fotorrealista (Google Photorealistic 3D Tiles)
+
+Hay dos formas de obtener los mismos modelos 3D de Google:
+
+**A. Cesium ion (recomendada: gratis y sin tarjeta)**
+1. Crea una cuenta en [ion.cesium.com](https://ion.cesium.com/signup).
+2. *Asset Depot* → «Google Photorealistic 3D Tiles» → *Add to my assets*.
+3. *Access Tokens* → copia el *Default Token* (o crea uno con el dominio de la web permitido).
+4. Pégalo en la app (*🌍 Realista*) o guárdalo como secreto `CESIUM_ION_TOKEN` del repositorio.
+
+**B. Clave propia de Google Cloud**
 
 1. En [Google Cloud Console](https://console.cloud.google.com/) crea un proyecto y activa la
    facturación (la Map Tiles API tiene un uso mensual gratuito; consulta los precios vigentes).

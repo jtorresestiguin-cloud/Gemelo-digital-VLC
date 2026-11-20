@@ -375,3 +375,5 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
   .drone-help .keys { display: none; }
 }
 .app.flying .goto { display: none; }
+.steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: #cbd5e1; line-height: 1.45; }
+.steps a { color: #93c5fd; }
