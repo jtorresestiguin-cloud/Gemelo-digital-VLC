@@ -20,9 +20,8 @@ page.on('console', (m) => { if (m.type() === 'error') stats.errors.push(m.text()
 
 await page.goto(URL, { waitUntil: 'networkidle', timeout: 90_000 });
 await page.waitForTimeout(4000);
-// modo grabación fuera: interesa ver la interfaz en la primera captura
-await page.click('.toolbar-actions >> text=Realista');
-await page.waitForTimeout(25_000);
+// la ciudad fotorrealista se activa sola al abrir (modo simple)
+await page.waitForTimeout(40_000);
 const shot = async (file) => {
   try {
     await page.screenshot({ path: `${OUT}/${file}`, timeout: 180_000 });
@@ -32,7 +31,7 @@ const shot = async (file) => {
   }
 };
 await shot('01-inicio.png');
-console.log('Estado del panel:', await page.locator('.photoreal .error').innerText().catch(() => 'sin errores'));
+console.log('Aviso en pantalla:', await page.locator('.toast').allInnerTexts().catch(() => []));
 
 for (const [name, label] of [['02-centro', 'Centro'], ['03-ciutat-arts', 'Ciutat de les Arts'], ['04-port', 'Port']]) {
   await page.click(`.goto >> text=${label}`);

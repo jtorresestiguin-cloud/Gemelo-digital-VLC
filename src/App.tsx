@@ -58,13 +58,20 @@ const writePref = (key: string, v: unknown) => {
 };
 
 const runtime = new CityRuntime();
+
+/**
+ * Modo simple: ciudad fotorrealista al abrir y solo los servicios públicos.
+ * El resto de funciones (autobuses, tráfico, escenarios, análisis, BIM…) sigue en el
+ * código y se recupera poniendo SIMPLE = false.
+ */
+const SIMPLE = true;
 type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 
 /** Por defecto el mapa sale limpio: solo los edificios 3D; cada capa se activa desde el panel. */
 const ALL_LAYERS: Record<LayerKey, boolean> = {
   emtBuses: false, emtBuses3d: false, emtLabels: false, emtTrails: false, emtRoutes: false, emtStops: false,
-  services: false, districts: false, ortho: false, terrain: false, bim: true,
-  buildings: true, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false,
+  services: false, districts: false, ortho: false, terrain: false, bim: !SIMPLE,
+  buildings: !SIMPLE, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false,
 };
 /** Al encender los autobuses se encienden también sus complementos (etiquetas, estelas, 3D). */
 const EMT_SET: LayerKey[] = ['emtBuses', 'emtBuses3d', 'emtLabels', 'emtTrails'];
@@ -101,8 +108,9 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [busMode, setBusMode] = useState<BusColorMode>('movement');
   const [savedCred, setSavedCred] = useState<PhotorealCredential | undefined>(readSavedCred);
-  const [photoreal, setPhotoreal] = useState(false);
-  const [photorealState, setPhotorealState] = useState<PhotorealState>({ state: 'off' });
+  // con token configurado, la ciudad fotorrealista se ve nada más abrir
+  const [photoreal, setPhotoreal] = useState(() => !!(BUILD_CRED ?? readSavedCred()));
+  const [photorealState, setPhotorealState] = useState<PhotorealState>(() => (BUILD_CRED ?? readSavedCred() ? { state: 'loading' } : { state: 'off' }));
   const activeCred = BUILD_CRED ?? savedCred;
   const [realistic, setRealistic] = useState<RealisticOptions | null>(null);
   const [realisticStatus, setRealisticStatus] = useState<RealisticStatus | null>(null);
@@ -212,7 +220,7 @@ export default function App() {
   }, [baseMapOnline]);
 
   useEffect(() => {
-    runtime.start();
+    runtime.start({ servicesOnly: SIMPLE });
     return () => runtime.stop();
   }, []);
 
@@ -232,10 +240,10 @@ export default function App() {
           <span className="logo" aria-hidden>▮▮▮</span>
           <div>
             <h1>Gemelo Digital València</h1>
-            <span className="muted">Movilidad, medio ambiente y puerto en tiempo real</span>
+            <span className="muted">{SIMPLE ? 'Servicios públicos de la ciudad' : 'Movilidad, medio ambiente y puerto en tiempo real'}</span>
           </div>
         </div>
-        <KpiBar snapshot={snapshot} />
+        {!SIMPLE && <KpiBar snapshot={snapshot} />}
       </header>
 
       <CityMap
@@ -275,6 +283,7 @@ export default function App() {
       )}
 
       <MapToolbar
+        simple={SIMPLE}
         minimized={toolbarMin}
         onMinimize={setToolbarMin}
         theme={theme}
@@ -294,7 +303,7 @@ export default function App() {
           } else if (realistic) {
             setRealistic(null);
           } else if (activeCred) {
-            // con token: la ciudad fotogramétrica de Google (como el modelo de Palma)
+            // con token: la ciudad fotogramétrica de Google
             setPhotoreal(true);
             setPhotorealState({ state: 'loading' });
           } else {
@@ -357,10 +366,14 @@ export default function App() {
         <button className="record-exit" onClick={() => setRecording(false)}>Modo grabación · pulsa R o Esc para salir</button>
       )}
 
+      {photorealState.state === 'error' && (
+        <button className="toast" onClick={() => setPhotorealState({ state: 'off' })}>No se pudo cargar la ciudad fotorrealista: {photorealState.message} ✕</button>
+      )}
+      {photoreal && photorealState.state === 'loading' && <div className="toast">Cargando la ciudad fotorrealista…</div>}
       {baseMapOnline === false && showBaseMapToast && (
         <button className="toast" onClick={() => setShowBaseMapToast(false)}>Cartografía base no disponible: se muestran solo las capas de datos. ✕</button>
       )}
-      {critical > 0 && collapsed && (
+      {!SIMPLE && critical > 0 && collapsed && (
         <button className="toast danger" onClick={() => { setTab('alerts'); setCollapsed(false); }}>{critical} alerta(s) crítica(s) · ver</button>
       )}
 
@@ -371,15 +384,30 @@ export default function App() {
         <div className="panel-handle" onClick={() => setCollapsed((c) => !c)} role="button" aria-label="Mostrar u ocultar panel">
           <span />
         </div>
-        <nav className="tabs">
+        {!SIMPLE && <nav className="tabs">
           {tabs.map(([id, label]) => (
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); setCollapsed(false); }}>{label}</button>
           ))}
-        </nav>
+        </nav>}
         <div className="panel-body">
-          {tab === 'alerts' && <AlertsPanel alerts={snapshot.alerts} onFocus={(p) => { setFocus({ lngLat: p, seq: Date.now() }); if (window.innerWidth < 760) setCollapsed(true); }} />}
-          {tab === 'sources' && <SourcesPanel sources={snapshot.sources} perf={perf} baseMapOnline={baseMapOnline} districtsOfficial={snapshot.districtsOfficial} />}
-          {tab === 'layers' && (
+          {SIMPLE && (
+            <ServicesPanel
+              services={snapshot.state.services}
+              status={snapshot.sources.find((s) => s.id === 'services')}
+              enabled={serviceCats}
+              onChange={(c) => {
+                setServiceCats(c);
+                setLayers((l) => ({ ...l, services: c.length > 0 }));
+              }}
+              onFocus={(p) => {
+                setFocus({ lngLat: p, seq: Date.now(), zoom: 17 });
+                if (window.innerWidth < 760) setCollapsed(true);
+              }}
+            />
+          )}
+          {!SIMPLE && tab === 'alerts' && <AlertsPanel alerts={snapshot.alerts} onFocus={(p) => { setFocus({ lngLat: p, seq: Date.now() }); if (window.innerWidth < 760) setCollapsed(true); }} />}
+          {!SIMPLE && tab === 'sources' && <SourcesPanel sources={snapshot.sources} perf={perf} baseMapOnline={baseMapOnline} districtsOfficial={snapshot.districtsOfficial} />}
+          {!SIMPLE && tab === 'layers' && (
             <LayersPanel
               layers={layers}
               onToggle={toggleLayer}
@@ -447,8 +475,8 @@ export default function App() {
               />
             </LayersPanel>
           )}
-          {tab === 'analysis' && <AnalysisPanel history={snapshot.history} />}
-          {tab === 'scenarios' && <ScenariosPanel active={snapshot.overridesActive} onRun={(s) => { runtime.triggerScenario(s); if (s !== 'reset') setTab('alerts'); }} />}
+          {!SIMPLE && tab === 'analysis' && <AnalysisPanel history={snapshot.history} />}
+          {!SIMPLE && tab === 'scenarios' && <ScenariosPanel active={snapshot.overridesActive} onRun={(s) => { runtime.triggerScenario(s); if (s !== 'reset') setTab('alerts'); }} />}
         </div>
       </aside>
     </div>

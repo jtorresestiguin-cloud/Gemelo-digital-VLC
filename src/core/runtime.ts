@@ -21,7 +21,8 @@ export class CityRuntime {
   private timers: ReturnType<typeof setInterval>[] = [];
   private unsubscribe?: () => void;
 
-  start(): void {
+  /** `servicesOnly`: modo simple, solo distritos y servicios públicos (sin simulación ni tiempo real). */
+  start(opts: { servicesOnly?: boolean } = {}): void {
     if (this.unsubscribe) return;
     this.unsubscribe = this.bus.subscribe('*', (m) => this.store.apply(m));
 
@@ -29,6 +30,10 @@ export class CityRuntime {
     fetchDistricts()
       .then((d) => this.store.setDistricts(d, true))
       .catch(() => { /* se mantienen los límites aproximados */ });
+    if (opts.servicesOnly) {
+      this.startServices();
+      return;
+    }
 
     this.worker = new Worker(new URL('../sim/sim.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<RawMessage>) => {

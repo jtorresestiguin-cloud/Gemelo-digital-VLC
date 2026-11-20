@@ -5,6 +5,14 @@ heterogéneas (datos abiertos municipales, meteorología, sensores IoT, metro y 
 **bus común**, las cruza con un **motor de reglas** por distrito y muestra el resultado sobre
 la ciudad en 3D.
 
+## Modo simple (actual)
+
+La web abre directamente la **ciudad fotorrealista 3D** (modelos de Google vía Cesium ion,
+con el token del secreto `CESIUM_ION_TOKEN`) y muestra solo los **servicios públicos** con sus
+filtros y buscador, más los controles para moverse (Ir a, Girar, Dron, Visita guiada, Solo
+mapa). El resto de funciones descritas abajo sigue en el código y se recupera poniendo
+`SIMPLE = false` en `src/App.tsx`.
+
 ## Qué hace
 
 - **7 fuentes en tiempo real, 5 protocolos** en un bus común (`src/core/bus.ts`):

@@ -26,7 +26,7 @@ export function PhotorealPanel({ enabled, state, buildCred, savedCred, onSaveCre
     <div className="photoreal">
       <h4>Fotogrametría de Google (opcional, requiere cuenta)</h4>
       <p className="muted small">
-        Si en algún momento tenéis cuenta: los modelos 3D de Google con fachadas fotografiadas, los del vídeo de Palma.
+        Si en algún momento tenéis cuenta: los modelos 3D de Google con fachadas fotografiadas.
       </p>
       {!cred && (
         <>
