@@ -8,6 +8,7 @@ import { fetchAir, fetchBikes, fetchTraffic, fetchWeather } from '../src/adapter
 import { fetchDistricts } from '../src/adapters/districts';
 import { fetchServices } from '../src/adapters/services';
 import { fetchBusPositions, fetchRoutes, fetchStops } from '../src/transit/emt';
+import { ION_API, ION_GOOGLE_ASSET, tilesetFromIonEndpoint } from '../src/map/google3d';
 
 const report = (name: string, n: number, sample: unknown) => console.log(`[${name}] ${n} elementos · ${JSON.stringify(sample).slice(0, 250)}`);
 
@@ -59,5 +60,20 @@ describe('fuentes reales', () => {
     const routes = await fetchRoutes();
     report('emt-rutas', routes.length, routes.map((r) => r.line));
     expect(routes.length).toBeGreaterThan(30);
+  });
+  it('Cesium ion: token de la web y modelos fotorrealistas de Google', async () => {
+    const token = process.env.CESIUM_ION_TOKEN?.trim();
+    if (!token) return console.log('[ion] sin token configurado (secreto CESIUM_ION_TOKEN)');
+    const origin = { Origin: 'https://jtorresestiguin-cloud.github.io', Referer: 'https://jtorresestiguin-cloud.github.io/Gemelo-digital-VLC/' };
+    const r = await fetch(`${ION_API}/${ION_GOOGLE_ASSET}/endpoint`, { headers: { Authorization: `Bearer ${token}`, ...origin } });
+    const body = await r.text();
+    console.log(`[ion] endpoint HTTP ${r.status} · ${body.replace(/key=[^"&]+/g, 'key=***').slice(0, 300)}`);
+    expect(r.status).toBe(200);
+    const url = tilesetFromIonEndpoint(JSON.parse(body));
+    const root = await fetch(url, { headers: origin });
+    const rootText = await root.text();
+    console.log(`[google] root.json HTTP ${root.status} · ${rootText.slice(0, 200)}`);
+    expect(root.status).toBe(200);
+    expect(JSON.parse(rootText).root).toBeTruthy();
   });
 });

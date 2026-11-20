@@ -20,3 +20,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx vitest run -c vitest.live.config.ts --reporter=verbose
+        env:
+          CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}

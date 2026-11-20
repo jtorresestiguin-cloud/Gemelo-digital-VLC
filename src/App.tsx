@@ -274,8 +274,14 @@ export default function App() {
           if (photoreal) {
             setPhotoreal(false);
             setPhotorealState({ state: 'off' });
+          } else if (realistic) {
+            setRealistic(null);
+          } else if (activeCred) {
+            // con token: la ciudad fotogramétrica de Google (como el modelo de Palma)
+            setPhotoreal(true);
+            setPhotorealState({ state: 'loading' });
           } else {
-            setRealistic((r) => (r ? null : { hour: null, shadows: perf.profile !== 'bajo' }));
+            setRealistic({ hour: null, shadows: perf.profile !== 'bajo' });
           }
         }}
       />
