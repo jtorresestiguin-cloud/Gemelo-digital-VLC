@@ -80,7 +80,7 @@ export const CURATED_TOURS: Tour[] = [
   ]),
 
   T('Patrimonio industrial del Grau', 'industrial-grau', 'La ruta municipal de naves, almacenes, chimeneas y muelles del barrio portuario.', [
-    { name: 'Estación del Grau', subtitle: 'Avda. del Ingeniero Manuel Soto · origen de la ruta del puerto', center: [-0.33226, 39.45828], zoom: 17.8, pitch: 62, bearing: 30, hold: 3 },
+    { name: 'Antigua estación del Grau', subtitle: 'Avda. del Ingeniero Manuel Soto · origen de la ruta del puerto', center: [-0.33264, 39.45902], zoom: 17.8, pitch: 62, bearing: 30, hold: 3 },
     { name: 'Tinglados 4 y 5', subtitle: 'Cobertizos portuarios modernistas sobre el muelle', center: [-0.33133, 39.45821], zoom: 17.8, pitch: 64, bearing: 90, hold: 3.5 },
     { name: 'Grúa-Cabria', subtitle: 'Antigua grúa de carga del puerto', center: [-0.32944, 39.46200], zoom: 18, pitch: 62, bearing: 150, hold: 3 },
     { name: 'Edificio de la Aduana', subtitle: 'Plaza de la Aduana · Junta de Obras del Puerto', center: [-0.32663, 39.46269], zoom: 18, pitch: 62, bearing: 210, hold: 3 },

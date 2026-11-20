@@ -429,3 +429,17 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
   .toast { bottom: 110px; }
 }
 @media (max-width: 760px) { .panel .services > h4 { display: none; } }
+
+/* Ficha breve de monumento */
+.monument-popup .maplibregl-popup-content { padding: 12px 14px 10px; }
+.monument-card strong { font-size: 14px; display: block; padding-right: 14px; }
+.monument-card .mon-meta { color: #f59e0b; font-size: 11px; margin-top: 2px; }
+.monument-card p { margin: 6px 0 8px; line-height: 1.4; font-size: 12.5px; }
+.monument-card .mon-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.monument-card .mon-tours { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 8px; }
+.monument-card button { font: inherit; cursor: pointer; border-radius: 6px; }
+.monument-card .mon-tour { text-align: left; background: rgba(245, 158, 11, 0.14); color: var(--text); border: 1px solid rgba(245, 158, 11, 0.45); padding: 4px 8px; font-size: 12px; }
+.monument-card .mon-actions { display: flex; gap: 10px; align-items: center; border-top: 1px solid rgba(148, 163, 184, 0.25); padding-top: 7px; }
+.monument-card .mon-actions button { background: none; border: none; color: #93c5fd; padding: 0; font-size: 12px; }
+.monument-card .mon-actions a { font-size: 12px; text-decoration: none; }
+.monuments-switch { margin-bottom: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); padding-bottom: 8px; }

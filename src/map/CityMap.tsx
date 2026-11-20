@@ -15,11 +15,12 @@ import { enablePhotoreal, setBaseMapVisible, type PhotorealCredential, type Phot
 import type { RealisticOptions, RealisticStatus } from '../realistic/RealisticLayer';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
+import { monumentById, monumentsGeo, type Monument } from '../tour/monuments';
 import {
   TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks';
+export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -67,6 +68,7 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
   incidents: ['vlc-incidents'],
   alerts: ['vlc-alert-pulse', 'vlc-alerts', 'vlc-routes', 'vlc-route-target'],
   landmarks: ['vlc-landmarks'],
+  monuments: ['vlc-monuments', 'vlc-monuments-label'],
 };
 
 const SEVERITY_COLOR = ['match', ['get', 'severity'], 'critical', '#dc2626', 'warning', '#f59e0b', '#3b82f6'] as unknown as string;
@@ -171,12 +173,42 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
     paint: { 'circle-color': '#111827', 'circle-radius': ['+', 5, ['*', 2, ['get', 'severity']]], 'circle-stroke-color': '#fbbf24', 'circle-stroke-width': 3 } });
   map.addLayer({ id: 'vlc-landmarks', type: 'circle', source: 'vlc-landmarks',
     paint: { 'circle-color': '#f97316', 'circle-radius': 5, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+  // Monumentos de las visitas guiadas: punto discreto y nombre solo de cerca
+  map.addSource('vlc-monuments', { type: 'geojson', data: monumentsGeo() });
+  map.addLayer({ id: 'vlc-monuments', type: 'circle', source: 'vlc-monuments', minzoom: 12.5,
+    paint: {
+      'circle-color': '#b45309',
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12.5, 3, 16, 6.5],
+      'circle-stroke-color': '#fff7ed',
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12.5, 1, 16, 2],
+    } });
+  if (map.getStyle().glyphs) {
+    map.addLayer({ id: 'vlc-monuments-label', type: 'symbol', source: 'vlc-monuments', minzoom: 15.6,
+      layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.1], 'text-anchor': 'top', 'text-max-width': 9, 'text-optional': true },
+      paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 } });
+  }
   map.addLayer({ id: 'vlc-alert-pulse', type: 'circle', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'alert'],
     paint: { 'circle-color': SEVERITY_COLOR, 'circle-opacity': 0.25, 'circle-radius': 24, 'circle-stroke-color': SEVERITY_COLOR, 'circle-stroke-width': 2 } });
   map.addLayer({ id: 'vlc-alerts', type: 'circle', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'alert'],
     paint: { 'circle-color': SEVERITY_COLOR, 'circle-radius': 8, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
   map.addLayer({ id: 'vlc-route-target', type: 'circle', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'route-target'],
     paint: { 'circle-color': '#7c3aed', 'circle-radius': 9, 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
+}
+
+const escHtml = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** Ficha breve de un monumento: qué es, cuándo y quién, y en qué visitas aparece. */
+export function monumentHtml(m: Monument): string {
+  const meta = [m.info.when, m.info.who].filter(Boolean).map(escHtml).join(' · ');
+  const tours = m.tours
+    .map((t) => `<button class="mon-tour" data-tour="${escHtml(t.id)}" data-stop="${t.stop}">▶ ${escHtml(t.title)}</button>`)
+    .join('');
+  const [lng, lat] = m.lngLat;
+  const route = `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(5)},${lng.toFixed(5)}`;
+  return `<div class="monument-card"><strong>${escHtml(m.name)}</strong>${meta ? `<div class="mon-meta">${meta}</div>` : ''}`
+    + `<p>${escHtml(m.info.text)}</p>`
+    + `<div class="mon-label">Aparece en la visita</div><div class="mon-tours">${tours}</div>`
+    + `<div class="mon-actions"><button data-act="zoom">🔍 Acercar</button><a href="${route}" target="_blank" rel="noopener">📍 Cómo llegar</a></div></div>`;
 }
 
 const fmt = (v: unknown) => (typeof v === 'number' ? (v < 0 ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v ?? ''));
@@ -240,9 +272,13 @@ interface Props {
   /** la cámara gira lentamente alrededor del centro */
   orbit: boolean;
   camera?: { preset: CameraPreset; seq: number };
+  /** «▶ visita» desde la ficha de un monumento */
+  onMonumentTour?: (tourId: string, stop: number) => void;
 }
 
-export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealCred, onPhotoreal, realistic, onRealistic }: Props) {
+export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealCred, onPhotoreal, realistic, onRealistic, onMonumentTour }: Props) {
+  const onMonumentTourRef = useRef(onMonumentTour);
+  onMonumentTourRef.current = onMonumentTour;
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -281,7 +317,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         setReady(true);
         onMapReady?.(map!);
       });
-      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target'];
+      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target', 'vlc-monuments', 'vlc-monuments-label'];
       // Un único manejador: ficha solo del elemento más alto bajo el puntero (los distritos quedan debajo)
       let popup: maplibregl.Popup | undefined;
       map.on('click', (e) => {
@@ -292,6 +328,18 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         const props = (f?.properties ?? {}) as Record<string, unknown>;
         highlightLine(map!, props.kind === 'bus' ? String(props.line) : null);
         if (!f) return;
+        const mon = props.kind === 'monument' ? monumentById(String(props.id)) : undefined;
+        if (mon) {
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'monument-popup' }).setLngLat(mon.lngLat).setHTML(monumentHtml(mon)).addTo(map!);
+          const el = popup.getElement();
+          el.querySelector('[data-act="zoom"]')?.addEventListener('click', () =>
+            map!.flyTo({ center: mon.lngLat, zoom: mon.view.zoom, pitch: mon.view.pitch, bearing: mon.view.bearing, speed: 0.8 }));
+          el.querySelectorAll<HTMLButtonElement>('[data-tour]').forEach((b) => b.addEventListener('click', () => {
+            popup?.remove();
+            onMonumentTourRef.current?.(b.dataset.tour!, Number(b.dataset.stop));
+          }));
+          return;
+        }
         popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(popupHtml(f.properties as Record<string, unknown>)).addTo(map!);
       });
       for (const id of clickable) {

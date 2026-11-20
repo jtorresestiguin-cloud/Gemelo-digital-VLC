@@ -22,3 +22,26 @@ describe('visitas guiadas temáticas', () => {
     expect(buildTimeline(tour).duration).toBeGreaterThan(10);
   });
 });
+
+import { MONUMENTS } from './monuments';
+import { monumentHtml } from '../map/CityMap';
+
+describe('fichas de monumentos', () => {
+  it('cada monumento tiene texto, visita e id único', () => {
+    expect(MONUMENTS.length).toBeGreaterThan(40);
+    expect(new Set(MONUMENTS.map((m) => m.id)).size).toBe(MONUMENTS.length);
+    for (const m of MONUMENTS) {
+      expect(m.info.text.length, m.name).toBeGreaterThan(20);
+      expect(m.info.text.length, m.name).toBeLessThan(160);
+      expect(m.tours.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('los monumentos repetidos se unen y enlazan a todas sus visitas', () => {
+    const reloj = MONUMENTS.find((m) => m.name === 'Edificio del Reloj')!;
+    expect(reloj.tours.map((t) => t.id)).toEqual(expect.arrayContaining(['modernista', 'maritima']));
+    const html = monumentHtml(reloj);
+    expect(html).toContain('data-tour="maritima"');
+    expect(html).toContain('google.com/maps/dir');
+  });
+});

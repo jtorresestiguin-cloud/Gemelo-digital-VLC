@@ -7,6 +7,7 @@ import { AlertsPanel, KpiBar, LayersPanel, ScenariosPanel, SourcesPanel } from '
 import { AnalysisPanel } from './ui/AnalysisPanel';
 import { BimPanel, type BimModel } from './ui/BimPanel';
 import { ServicesPanel } from './ui/ServicesPanel';
+import { CURATED_TOURS } from './tour/curated';
 import { SERVICE_CATEGORIES } from './adapters/services';
 import type { ServiceCategory } from './core/types';
 import type { Map as MlMap } from 'maplibre-gl';
@@ -74,7 +75,7 @@ type Tab = 'alerts' | 'sources' | 'layers' | 'analysis' | 'scenarios';
 const ALL_LAYERS: Record<LayerKey, boolean> = {
   emtBuses: false, emtBuses3d: false, emtLabels: false, emtTrails: false, emtRoutes: false, emtStops: false,
   services: false, districts: false, ortho: false, terrain: false, bim: !SIMPLE,
-  buildings: !SIMPLE, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false,
+  buildings: !SIMPLE, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false, monuments: true,
 };
 /** Al encender los autobuses se encienden también sus complementos (etiquetas, estelas, 3D). */
 const EMT_SET: LayerKey[] = ['emtBuses', 'emtBuses3d', 'emtLabels', 'emtTrails'];
@@ -154,15 +155,15 @@ export default function App() {
     };
   }, [map, drone]);
 
-  const startGuided = (tour: Tour) => {
+  const startGuided = (tour: Tour, stop = 0) => {
     if (!map) return;
     if (isMobile()) setCollapsed(true);
     setTourOpen(false);
     setOrbit(false);
     guided?.ctl.dispose();
     const ctl = new GuidedTour(map, tour, (state) => setGuided((g) => (g ? { ...g, state } : g)));
-    setGuided({ ctl, state: { index: 0, flying: true, userControl: false, autoplay: false } });
-    ctl.goTo(0);
+    setGuided({ ctl, state: { index: stop, flying: true, userControl: false, autoplay: false } });
+    ctl.goTo(stop);
   };
   const exitGuided = () => {
     guided?.ctl.dispose();
@@ -256,6 +257,10 @@ export default function App() {
         layers={layers}
         perf={perf}
         focus={focus}
+        onMonumentTour={(id, stop) => {
+          const t = CURATED_TOURS.find((x) => x.id === id);
+          if (t) startGuided(t, stop);
+        }}
         onBaseMap={setBaseMapOnline}
         onMapReady={(m) => {
           setMap(m);
@@ -402,6 +407,13 @@ export default function App() {
           ))}
         </nav>}
         <div className="panel-body">
+          {SIMPLE && (
+            <label className="switch monuments-switch">
+              <span>🏛 Monumentos <span className="muted small">(toca uno para ver su ficha)</span></span>
+              <input type="checkbox" checked={layers.monuments} onChange={() => setLayers((l) => ({ ...l, monuments: !l.monuments }))} />
+              <i aria-hidden />
+            </label>
+          )}
           {SIMPLE && (
             <ServicesPanel
               services={snapshot.state.services}
