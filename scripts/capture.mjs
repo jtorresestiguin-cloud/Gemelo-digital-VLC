@@ -41,6 +41,19 @@ for (const [name, label] of [['02-centro', 'Centro'], ['03-ciutat-arts', 'Ciutat
   await shot(`${name}.png`);
   await page.keyboard.press('r');
 }
+// «Ciudad en vivo»: tráfico, aire y Valenbisi sobre la ciudad fotorrealista
+for (const t of ['Tráfico', 'Calidad del aire', 'Valenbisi']) await page.locator('.live .switch', { hasText: t }).click().catch(() => console.log('sin interruptor', t));
+await page.waitForTimeout(15_000);
+await shot('05-en-vivo-panel.png');
+for (const [name, label] of [['06-en-vivo-centro', 'Centro'], ['07-en-vivo-ciudad', 'Toda la ciudad']]) {
+  await page.click(`.goto >> text=${label}`);
+  await page.waitForTimeout(30_000);
+  await page.keyboard.press('r');
+  await page.waitForTimeout(1000);
+  await shot(`${name}.png`);
+  await page.keyboard.press('r');
+}
+console.log('En vivo:', await page.locator('.live').innerText().catch(() => ''));
 writeFileSync(`${OUT}/stats.json`, JSON.stringify(stats, null, 2));
 console.log(JSON.stringify(stats, null, 2));
 await browser.close();

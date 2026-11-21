@@ -20,6 +20,7 @@ export class CityRuntime {
   private worker?: Worker;
   private timers: ReturnType<typeof setInterval>[] = [];
   private unsubscribe?: () => void;
+  private live = new Set<SourceId>();
 
   /** `servicesOnly`: modo simple, solo distritos y servicios públicos (sin simulación ni tiempo real). */
   start(opts: { servicesOnly?: boolean } = {}): void {
@@ -32,8 +33,10 @@ export class CityRuntime {
       .catch(() => { /* se mantienen los límites aproximados */ });
     if (opts.servicesOnly) {
       this.startServices();
+      this.enableLive('weather');
       return;
     }
+    (['traffic', 'bikes', 'air', 'weather'] as const).forEach((id) => this.live.add(id));
 
     this.worker = new Worker(new URL('../sim/sim.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<RawMessage>) => {
@@ -46,6 +49,21 @@ export class CityRuntime {
     this.startServices();
     this.startEmt();
     this.poll('weather', 10 * MIN, async () => this.bus.publish({ source: 'weather', protocol: 'REST', topic: 'weather', data: await fetchWeather(), live: true, ts: Date.now() }));
+  }
+
+  /**
+   * Modo simple: las capas en tiempo real solo se consultan cuando el usuario las activa
+   * (y desde entonces se refrescan solas). En el modo completo ya están en marcha.
+   */
+  enableLive(id: 'traffic' | 'bikes' | 'air' | 'weather'): void {
+    if (!this.unsubscribe || this.live.has(id)) return;
+    this.live.add(id);
+    const every = { traffic: 3 * MIN, bikes: 3 * MIN, air: 10 * MIN, weather: 10 * MIN }[id];
+    const fetchers = { traffic: fetchTraffic, bikes: fetchBikes, air: fetchAir, weather: fetchWeather };
+    this.poll(id, every, async () => {
+      const data = await fetchers[id]();
+      this.bus.publish({ source: id, protocol: 'REST', topic: id, data, live: true, ts: Date.now() } as never);
+    });
   }
 
   /** Autobuses EMT: posiciones cada 15 s (movimiento reconstruido), paradas y rutas al arrancar. */
@@ -114,6 +132,7 @@ export class CityRuntime {
   stop(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.live.clear();
     this.timers.forEach(clearInterval);
     this.timers = [];
     this.worker?.terminate();
@@ -140,7 +159,10 @@ export class CityRuntime {
         } else {
           this.send({ type: 'enable', source: id as SimSource });
         }
-        this.store.setSourceStatus(id, { detail: `API no disponible (${reason}); usando respaldo simulado` });
+        this.store.setSourceStatus(id, {
+          detail: this.worker ? `API no disponible (${reason}); usando respaldo simulado` : `API no disponible (${reason}); se reintentará`,
+          ...(this.worker ? {} : { mode: 'error' as const }),
+        });
       }
     };
     void tick();

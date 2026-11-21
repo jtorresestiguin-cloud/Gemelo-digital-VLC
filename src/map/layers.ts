@@ -6,8 +6,20 @@ import { LANDMARKS, METRO_LINES, METRO_STATIONS, PORT_ASSETS } from '../data/sta
 const fc = (features: FeatureCollection['features']): FeatureCollection => ({ type: 'FeatureCollection', features });
 
 export const TRAFFIC_COLORS: Record<string, string> = {
-  fluid: '#22c55e', dense: '#f59e0b', congested: '#ef4444', closed: '#111827', unknown: '#94a3b8',
+  fluid: '#34d399', dense: '#fbbf24', congested: '#f43f5e', closed: '#e2e8f0', unknown: '#94a3b8',
 };
+
+/** Índice de Calidad del Aire (MITECO): categorías y colores oficiales. */
+export const AIR_LEVELS = [
+  { label: 'Buena', color: '#50f0e6' },
+  { label: 'Razonablemente buena', color: '#50ccaa' },
+  { label: 'Regular', color: '#f0e641' },
+  { label: 'Desfavorable', color: '#ff5050' },
+  { label: 'Muy desfavorable', color: '#960032' },
+  { label: 'Extremadamente desfavorable', color: '#7d2181' },
+] as const;
+
+export const BIKE_COLORS = { many: '#34d399', few: '#fbbf24', empty: '#f87171' } as const;
 export const TRAFFIC_LABELS: Record<string, string> = {
   fluid: 'Fluido', dense: 'Denso', congested: 'Congestionado', closed: 'Cortado', unknown: 'Sin datos',
 };

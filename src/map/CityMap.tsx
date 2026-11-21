@@ -17,7 +17,7 @@ import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
 import {
-  TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
+  AIR_LEVELS, BIKE_COLORS, TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
 export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments';
@@ -59,9 +59,9 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
   terrain: [],
   bim: ['vlc-bim'],
   buildings: ['vlc-buildings'],
-  traffic: ['vlc-traffic-casing', 'vlc-traffic'],
+  traffic: ['vlc-traffic-casing', 'vlc-traffic', 'vlc-traffic-closed'],
   bikes: ['vlc-bikes'],
-  air: ['vlc-air-halo', 'vlc-air'],
+  air: ['vlc-air-halo', 'vlc-air', 'vlc-air-label'],
   noise: ['vlc-noise'],
   metro: ['vlc-metro'],
   port: ['vlc-port'],
@@ -72,7 +72,12 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
 };
 
 const SEVERITY_COLOR = ['match', ['get', 'severity'], 'critical', '#dc2626', 'warning', '#f59e0b', '#3b82f6'] as unknown as string;
-const NO2_COLOR = ['step', ['get', 'no2'], '#94a3b8', 0, '#22c55e', 40, '#84cc16', 90, '#f59e0b', 150, '#ef4444', 200, '#7f1d1d'] as unknown as string;
+/** Colores oficiales del Índice de Calidad del Aire (MITECO); si falta la categoría, se estima por el NO₂. */
+const AIR_COLOR = ['match', ['get', 'quality'],
+  'Buena', AIR_LEVELS[0].color, 'Razonablemente Buena', AIR_LEVELS[1].color, 'Regular', AIR_LEVELS[2].color,
+  'Desfavorable', AIR_LEVELS[3].color, 'Muy Desfavorable', AIR_LEVELS[4].color, 'Extremadamente Desfavorable', AIR_LEVELS[5].color,
+  ['step', ['get', 'no2'], '#94a3b8', 0, AIR_LEVELS[0].color, 41, AIR_LEVELS[1].color, 91, AIR_LEVELS[2].color, 121, AIR_LEVELS[3].color, 231, AIR_LEVELS[4].color, 341, AIR_LEVELS[5].color],
+] as unknown as string;
 
 /** Ortofoto PNOA de máxima actualidad (© Instituto Geográfico Nacional), servicio WMTS. */
 const PNOA_TILES = 'https://www.ign.es/wmts/pnoa-ma?layer=OI.OrthoimageCoverage&style=default&tilematrixset=GoogleMapsCompatible&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/jpeg&TileMatrix={z}&TileCol={x}&TileRow={y}';
@@ -126,13 +131,24 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
     }, firstSymbol);
   }
 
-  map.addLayer({ id: 'vlc-traffic-casing', type: 'line', source: 'vlc-traffic', layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#0f172a', 'line-opacity': 0.35, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 9] } });
-  map.addLayer({ id: 'vlc-traffic', type: 'line', source: 'vlc-traffic', layout: { 'line-cap': 'round', 'line-join': 'round' },
+  // Tráfico: línea fina con un halo suave del mismo color (lo fluido, discreto; los atascos destacan)
+  const TRAFFIC_COLOR = ['match', ['get', 'state'], 'fluid', TRAFFIC_COLORS.fluid, 'dense', TRAFFIC_COLORS.dense, 'congested', TRAFFIC_COLORS.congested, 'closed', TRAFFIC_COLORS.closed, TRAFFIC_COLORS.unknown] as unknown as string;
+  const notUnknown = ['!=', ['get', 'state'], 'unknown'] as maplibregl.FilterSpecification;
+  map.addLayer({ id: 'vlc-traffic-casing', type: 'line', source: 'vlc-traffic', filter: notUnknown, layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': ['match', ['get', 'state'], 'fluid', TRAFFIC_COLORS.fluid, 'dense', TRAFFIC_COLORS.dense, 'congested', TRAFFIC_COLORS.congested, 'closed', TRAFFIC_COLORS.closed, TRAFFIC_COLORS.unknown],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.8, 16, 6],
+      'line-color': TRAFFIC_COLOR,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 6],
+      'line-opacity': ['match', ['get', 'state'], 'fluid', 0.12, 0.35],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 14],
     } });
+  map.addLayer({ id: 'vlc-traffic', type: 'line', source: 'vlc-traffic', filter: notUnknown, layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': TRAFFIC_COLOR,
+      'line-opacity': ['match', ['get', 'state'], 'fluid', 0.7, 0.95],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 11, ['match', ['get', 'state'], 'fluid', 0.8, 1.4], 16, ['match', ['get', 'state'], 'fluid', 2.2, 3.6]],
+    } });
+  map.addLayer({ id: 'vlc-traffic-closed', type: 'line', source: 'vlc-traffic', filter: ['==', ['get', 'state'], 'closed'],
+    paint: { 'line-color': '#f8fafc', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.2, 16, 3], 'line-dasharray': [1.5, 1.5] } });
   addTransitLayers(map, theme, busMode);
   map.addLayer({ id: 'vlc-routes', type: 'line', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'route'],
     paint: { 'line-color': '#7c3aed', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
@@ -143,19 +159,25 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 0.6, 16, 1.8],
     } });
+  // Calidad del aire: punto con aura difusa en los colores oficiales del índice (ICA)
   map.addLayer({ id: 'vlc-air-halo', type: 'circle', source: 'vlc-air',
-    paint: { 'circle-color': NO2_COLOR, 'circle-opacity': 0.18, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 18, 16, 60] } });
+    paint: { 'circle-color': AIR_COLOR, 'circle-opacity': 0.22, 'circle-blur': 1, 'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 11, 22, 17, 260] } });
   map.addLayer({ id: 'vlc-air', type: 'circle', source: 'vlc-air',
-    paint: { 'circle-color': NO2_COLOR, 'circle-radius': 7, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+    paint: {
+      'circle-color': AIR_COLOR, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4.5, 16, 8],
+      'circle-stroke-color': 'rgba(255,255,255,0.9)', 'circle-stroke-width': 1.5,
+    } });
   map.addLayer({ id: 'vlc-noise', type: 'circle', source: 'vlc-noise',
     paint: {
       'circle-color': ['interpolate', ['linear'], ['get', 'laeq'], 45, '#a5b4fc', 60, '#8b5cf6', 70, '#be185d'],
       'circle-radius': ['interpolate', ['linear'], ['get', 'laeq'], 45, 4, 75, 9], 'circle-opacity': 0.85,
     } });
-  map.addLayer({ id: 'vlc-bikes', type: 'circle', source: 'vlc-bikes',
+  // Valenbisi: puntos pequeños, solo de cerca
+  map.addLayer({ id: 'vlc-bikes', type: 'circle', source: 'vlc-bikes', minzoom: 12.5,
     paint: {
-      'circle-color': ['case', ['==', ['get', 'available'], 0], '#ef4444', ['interpolate', ['linear'], ['get', 'ratio'], 0, '#f97316', 0.5, '#facc15', 1, '#16a34a']],
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 6], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1,
+      'circle-color': ['case', ['==', ['get', 'available'], 0], BIKE_COLORS.empty, ['<', ['get', 'ratio'], 0.25], BIKE_COLORS.few, BIKE_COLORS.many],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12.5, 2, 16, 5],
+      'circle-stroke-color': 'rgba(255,255,255,0.85)', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12.5, 0.5, 16, 1.2],
     } });
   map.addLayer({ id: 'vlc-metro', type: 'circle', source: 'vlc-metro',
     paint: {
@@ -183,6 +205,9 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12.5, 1, 16, 2],
     } });
   if (map.getStyle().glyphs) {
+    map.addLayer({ id: 'vlc-air-label', type: 'symbol', source: 'vlc-air', minzoom: 13, filter: ['>=', ['get', 'no2'], 0],
+      layout: { 'text-field': ['concat', 'NO₂ ', ['to-string', ['get', 'no2']]], 'text-size': 11, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-allow-overlap': false },
+      paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 } });
     map.addLayer({ id: 'vlc-monuments-label', type: 'symbol', source: 'vlc-monuments', minzoom: 15.6,
       layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.1], 'text-anchor': 'top', 'text-max-width': 9, 'text-optional': true },
       paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 } });

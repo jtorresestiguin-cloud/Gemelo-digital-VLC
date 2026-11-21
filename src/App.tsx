@@ -7,6 +7,7 @@ import { AlertsPanel, KpiBar, LayersPanel, ScenariosPanel, SourcesPanel } from '
 import { AnalysisPanel } from './ui/AnalysisPanel';
 import { BimPanel, type BimModel } from './ui/BimPanel';
 import { ServicesPanel } from './ui/ServicesPanel';
+import { LivePanel } from './ui/LivePanel';
 import { CURATED_TOURS } from './tour/curated';
 import { SERVICE_CATEGORIES } from './adapters/services';
 import type { ServiceCategory } from './core/types';
@@ -247,7 +248,7 @@ export default function App() {
           <span className="logo" aria-hidden>▮▮▮</span>
           <div>
             <h1>Gemelo Digital València</h1>
-            <span className="muted">{SIMPLE ? 'Servicios públicos de la ciudad' : 'Movilidad, medio ambiente y puerto en tiempo real'}</span>
+            <span className="muted">{SIMPLE ? 'Servicios públicos y datos en vivo' : 'Movilidad, medio ambiente y puerto en tiempo real'}</span>
           </div>
         </div>
         {!SIMPLE && <KpiBar snapshot={snapshot} />}
@@ -401,7 +402,7 @@ export default function App() {
         </button>
         <div className="panel-handle" onClick={() => setCollapsed((c) => !c)} role="button" aria-label="Mostrar u ocultar panel">
           <span />
-          {SIMPLE && <b className="handle-label">Servicios públicos {collapsed ? '▲' : '▼'}</b>}
+          {SIMPLE && <b className="handle-label">Explorar la ciudad {collapsed ? '▲' : '▼'}</b>}
         </div>
         {!SIMPLE && <nav className="tabs">
           {tabs.map(([id, label]) => (
@@ -415,6 +416,17 @@ export default function App() {
               <input type="checkbox" checked={layers.monuments} onChange={() => setLayers((l) => ({ ...l, monuments: !l.monuments }))} />
               <i aria-hidden />
             </label>
+          )}
+          {SIMPLE && (
+            <LivePanel
+              state={snapshot.state}
+              sources={snapshot.sources}
+              layers={{ traffic: layers.traffic, air: layers.air, bikes: layers.bikes }}
+              onToggle={(k) => {
+                setLayers((l) => ({ ...l, [k]: !l[k] }));
+                runtime.enableLive(k);
+              }}
+            />
           )}
           {SIMPLE && (
             <ServicesPanel
