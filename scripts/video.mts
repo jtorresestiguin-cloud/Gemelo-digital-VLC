@@ -236,7 +236,7 @@ async function assemble() {
   const out = `${OUT}/gemelo-digital-valencia-${FORMAT}.mp4`;
   execFileSync('ffmpeg', [
     '-y', '-framerate', String(FPS), '-i', `${FRAMES}/f%05d.jpg`, '-i', `${OUT}/musica.wav`,
-    '-vf', scale, '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
+    '-vf', scale, '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-maxrate', '8M', '-bufsize', '16M', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
     '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out,
   ], { stdio: 'inherit' });
   console.log('vídeo listo:', out);
