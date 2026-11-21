@@ -18,6 +18,13 @@ jobs:
   compress:
     runs-on: ubuntu-latest
     steps:
+      # lo que ya hubiera publicado (p. ej. el otro formato) se conserva
+      - uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: videos
+          path: videos
+      - run: rm -rf videos/.git
       - uses: actions/download-artifact@v4
         with:
           pattern: video-*
@@ -29,6 +36,7 @@ jobs:
       - name: Comprimir (H.264, ~8 Mbps, compatible con todas las redes)
         run: |
           mkdir -p videos
+          cp in/portada-*.jpg videos/
           for f in in/*.mp4; do
             out="videos/$(basename "$f")"
             ffmpeg -y -i "$f" -c:v libx264 -preset slow -crf 22 -maxrate 8M -bufsize 16M \
@@ -37,7 +45,6 @@ jobs:
             name=$(basename "$f" .mp4)
             ffmpeg -y -i "$out" -vf "fps=1/8,scale=640:-2" -q:v 4 "videos/control-${name}-%02d.jpg"
           done
-          cp in/portada-*.jpg videos/
           ls -la videos
       - name: Publicar en la rama «videos»
         run: |

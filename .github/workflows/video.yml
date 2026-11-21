@@ -3,7 +3,8 @@ name: Vídeo para redes
 # Graba un vídeo del gemelo digital PUBLICADO (ciudad fotorrealista) en formato
 # horizontal (16:9) y vertical (9:16). Sin GPU cada fotograma tarda varios segundos,
 # así que el vídeo se reparte en 18 trozos que se dibujan en paralelo; luego se une,
-# se le pone música y se deja en la rama «videos» y como artefacto.
+# se le pone música y se deja como artefacto. Después, «Vídeo para redes (comprimir y
+# publicar)» lo deja en la rama «videos».
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +14,9 @@ on:
       fps:
         description: 'Fotogramas por segundo'
         default: '25'
+      formats:
+        description: 'Formatos a grabar (JSON)'
+        default: '["horizontal", "vertical"]'
 
 permissions:
   contents: write
@@ -27,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        format: [horizontal, vertical]
+        format: ${{ fromJSON(inputs.formats) }}
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        format: [horizontal, vertical]
+        format: ${{ fromJSON(inputs.formats) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -88,24 +92,3 @@ jobs:
           path: |
             video/*.mp4
             video/portada-*.jpg
-
-  publish:
-    needs: assemble
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: video-*
-          path: videos
-          merge-multiple: true
-      - name: Publicar en la rama «videos»
-        run: |
-          cd videos
-          ls -la
-          git init -q -b videos
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add .
-          git commit -q -m "Vídeo del gemelo digital para redes"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" videos

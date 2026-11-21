@@ -426,6 +426,8 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 
   /* atribución de Google arriba, pequeña, sin tapar los controles */
   .google-attrib { top: 52px; bottom: auto; left: 8px; max-width: calc(100% - 16px); font-size: 10px; padding: 2px 6px; }
+  /* en modo grabación va abajo (si no, top + bottom lo estiran a toda la altura) */
+  .app.recording .google-attrib { top: auto; bottom: 12px; }
   .toast { bottom: 110px; }
 }
 @media (max-width: 760px) { .panel .services > h4 { display: none; } }
