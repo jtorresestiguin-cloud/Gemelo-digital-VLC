@@ -14,51 +14,28 @@ async function probe(label: string, url: string, show = 1500) {
   }
 }
 
-it('nuevas fuentes', async () => {
+it('nuevas fuentes 2', async () => {
   const G = 'https://geoportal.valencia.es/server/rest/services/OPENDATA';
-  const folders = await probe('Geoportal carpetas', `${G}?f=json`, 3000);
-  try {
-    const services = (JSON.parse(folders).services ?? []) as { name: string; type: string }[];
-    console.log(services.map((s) => `${s.name} (${s.type})`).join('\n'));
-    for (const f of JSON.parse(folders).folders ?? []) console.log('carpeta', f);
-  } catch { /* */ }
-  for (const svc of ['Trafico', 'MedioAmbiente', 'UrbanismoEInfraestructuras', 'SociedadBienestar', 'Turismo']) {
-    const t = await probe(`Capas ${svc}`, `${G}/${svc}/MapServer?f=json`, 0);
-    try {
-      console.log((JSON.parse(t).layers ?? []).map((l: { id: number; name: string }) => `${l.id} ${l.name}`).join('\n'));
-    } catch { /* */ }
-  }
-  // aparcamientos: se busca la capa por nombre
-  const traf = await probe('Trafico json', `${G}/Trafico/MapServer?f=json`, 0);
-  try {
-    for (const l of JSON.parse(traf).layers as { id: number; name: string }[]) {
-      if (/aparc|parking|metro|tranv|carga|recarga|taxi|semaf|accid|corte|obra/i.test(l.name)) {
-        await probe(`Trafico/${l.id} ${l.name}`, `${G}/Trafico/MapServer/${l.id}/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=2&f=json`, 1800);
-      }
-    }
-  } catch { /* */ }
-  const ma = await probe('MedioAmbiente json', `${G}/MedioAmbiente/MapServer?f=json`, 0);
-  try {
-    for (const l of JSON.parse(ma).layers as { id: number; name: string }[]) {
-      if (/playa|platj|agua|aigua|ruido|soroll|sensor|polen|ozono|meteo|temperat|fuente|font/i.test(l.name)) {
-        await probe(`MedioAmbiente/${l.id} ${l.name}`, `${G}/MedioAmbiente/MapServer/${l.id}/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=2&f=json`, 1800);
-      }
-    }
-  } catch { /* */ }
-
-  // Agua de baño (Generalitat)
-  for (const id of ['puntos-de-muestreo-de-la-calidad-del-agua-en-la-comunitat-valenciana1', 'censo-de-zonas-aguas-de-bano-de-la-comunitat-valenciana']) {
-    const t = await probe(`GVA ${id}`, `https://dadesobertes.gva.es/api/3/action/package_show?id=${id}`, 0);
-    try {
-      for (const r of JSON.parse(t).result.resources as { name: string; url: string; format: string }[]) console.log(` - ${r.format} · ${r.name} · ${r.url}`);
-    } catch { /* */ }
-  }
-  await probe('Calidad agua València', 'https://valencia.es/ayuntamiento/calidad_aguas.nsf/fudatospw?readform=', 2500);
-
-  // Mar en vivo (Open-Meteo Marine)
-  await probe('Open-Meteo marine', 'https://marine-api.open-meteo.com/v1/marine?latitude=39.47&longitude=-0.31&current=wave_height,wave_period,wave_direction,sea_surface_temperature&timezone=Europe%2FMadrid', 800);
-  // FGV: comprobar CORS
-  await probe('FGV previsión (Xàtiva)', 'https://www.fgv.es/fgv/app/es/api/v1/V/horarios-prevision-3/43', 600);
-  // Polen / UV (Open-Meteo air quality)
-  await probe('Open-Meteo aire (polen, UV)', 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=39.47&longitude=-0.376&current=uv_index,grass_pollen,olive_pollen,european_aqi&timezone=Europe%2FMadrid', 800);
+  const q = (path: string, extra = '') => `${G}/${path}/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=2&f=json${extra}`;
+  for (const l of ['221', '220', '253', '252', '4']) await probe(`Trafico/${l}`, q(`Trafico/MapServer/${l}`), 1500);
+  for (const l of ['194', '221', '235', '254']) await probe(`count Trafico/${l}`, `${G}/Trafico/MapServer/${l}/query?where=1%3D1&returnCountOnly=true&f=json`, 200);
+  const now = Date.now();
+  await probe('obras vigentes', `${G}/Trafico/MapServer/235/query?where=${encodeURIComponent(`fecha_fin_periodo >= ${now} AND fecha_inicio_periodo <= ${now}`)}&returnCountOnly=true&f=json`, 300);
+  await probe('obras vigentes (timestamp)', `${G}/Trafico/MapServer/235/query?where=${encodeURIComponent("fecha_fin_periodo >= CURRENT_TIMESTAMP AND fecha_inicio_periodo <= CURRENT_TIMESTAMP")}&returnCountOnly=true&f=json`, 300);
+  await probe('obras estados', `${G}/Trafico/MapServer/235/query?where=1%3D1&outFields=estado,ocupacion&returnDistinctValues=true&returnGeometry=false&f=json`, 2500);
+  await probe('parkings todos', `${G}/Trafico/MapServer/194/query?where=1%3D1&outFields=nombre,plazastota,plazaslibr,ocupacion,ultima_mod,tipo&returnGeometry=false&f=json`, 5000);
+  await probe('metro salidas', 'https://geoportal.valencia.es/geoportal-services/api/v1/salidas-metro.html?estacion=28&lang=es', 1500);
+  await probe('metro salidas json?', 'https://geoportal.valencia.es/geoportal-services/api/v1/salidas-metro?estacion=28&lang=es', 1500);
+  await probe('ruido csv https', 'https://mapas.valencia.es/WebsMunicipales/uploads/atmosferica/ruido.csv', 1200);
+  await probe('ruido csv http', 'http://mapas.valencia.es/WebsMunicipales/uploads/atmosferica/ruido.csv', 1200);
+  await probe('ruido capa completa', `${G}/MedioAmbiente/MapServer/160/query?where=1%3D1&outFields=descripcio,localizaci,mediciones&returnGeometry=false&f=json`, 3000);
+  const W = 'https://terramapas.icv.gva.es/0501_CalidadAguas?request=GetFeature&service=WFS&version=2.0.0';
+  await probe('playas muestreo json', `${W}&typename=Playas.PuntosMuestreo&outputformat=application/json&count=2`, 2500);
+  await probe('playas muestreo csv', `${W}&typename=Playas.PuntosMuestreo&outputformat=csv`, 1500);
+  const csv = await probe('playas baño csv', `${W}&typename=Playas.PlayasBanyo&outputformat=csv`, 1500);
+  console.log('Valencia:\n' + csv.split('\n').filter((l) => /val[eè]ncia/i.test(l)).slice(0, 30).join('\n'));
+  const csv2 = await probe('muestreo csv (València)', `${W}&typename=Playas.PuntosMuestreo&outputformat=csv`, 0);
+  console.log('Valencia muestreo:\n' + csv2.split('\n').filter((l, i) => i === 0 || /val[eè]ncia/i.test(l)).slice(0, 30).join('\n'));
+  await probe('WFS capabilities', 'https://terramapas.icv.gva.es/0501_CalidadAguas?service=WFS&request=GetCapabilities', 4000);
+  await probe('aire polen todos', 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=39.47&longitude=-0.376&current=uv_index,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen&timezone=Europe%2FMadrid', 900);
 });
