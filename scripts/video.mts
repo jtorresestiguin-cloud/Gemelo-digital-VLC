@@ -165,7 +165,7 @@ async function main() {
 
   // Precarga: pasa por cada parada para llenar la caché de teselas
   for (const s of VIDEO_TOUR.stops) {
-    await page.evaluate((c) => (window as unknown as { __map: { jumpTo(o: unknown): void } }).__map.jumpTo(c), { center: s.center, zoom: s.zoom, pitch: s.pitch, bearing: s.bearing });
+    await page.evaluate((c) => { (window as unknown as { __map: { jumpTo(o: unknown): void } }).__map.jumpTo(c); }, { center: s.center, zoom: s.zoom, pitch: s.pitch, bearing: s.bearing });
     const ok = await settle(page, net, 60_000, 800);
     console.log('precarga', s.name, ok ? 'ok' : 'incompleta');
   }
