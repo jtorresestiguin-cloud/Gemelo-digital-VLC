@@ -53,11 +53,11 @@ export function layerQueryUrl(layer: string, offset = 0, where = '1=1'): string 
 }
 
 /** Descarga todas las entidades de una capa, paginando si el servidor limita el número de registros. */
-export async function fetchLayer(layer: string, { timeoutMs = 20_000, maxPages = 20 } = {}): Promise<GeoCollection> {
+export async function fetchLayer(layer: string, { timeoutMs = 20_000, maxPages = 20, where = '1=1' } = {}): Promise<GeoCollection> {
   const features: GeoFeature[] = [];
   for (let page = 0; page < maxPages; page++) {
     const j = await fetchJson<GeoCollection & { exceededTransferLimit?: boolean; properties?: { exceededTransferLimit?: boolean } }>(
-      layerQueryUrl(layer, features.length), timeoutMs,
+      layerQueryUrl(layer, features.length, where), timeoutMs,
     );
     features.push(...(j.features ?? []));
     const more = j.exceededTransferLimit || j.properties?.exceededTransferLimit;
