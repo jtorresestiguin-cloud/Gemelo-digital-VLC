@@ -388,7 +388,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
           const at = f.geometry.coordinates as LngLat;
           loadFichas()
             .then((doc) => {
-              const ficha = matchFicha(doc, String(props.name ?? ''), at);
+              const ficha = matchFicha(doc, String(props.name ?? ''), at, String(props.category ?? ''));
               if (!ficha || !shown.isOpen()) return;
               shown.setMaxWidth('300px').setHTML(fichaHtml(ficha, doc)).addClassName('ficha-popup');
               shown.setLngLat(at);

@@ -53,13 +53,20 @@ describe('fuentes reales', () => {
     // cuántos puntos del mapa tienen ficha ampliada (Mapa de Servicios Públicos CV)
     const doc = JSON.parse(readFileSync('public/data/fichas-vlc.json', 'utf8')) as FichasDoc;
     const inCity = s.filter((x) => x.lngLat[1] > 39.4 && x.lngLat[1] < 39.53 && x.lngLat[0] > -0.43 && x.lngLat[0] < -0.3);
-    const withFicha = inCity.filter((x) => matchFicha(doc, x.name, x.lngLat));
+    const withFicha = inCity.filter((x) => matchFicha(doc, x.name, x.lngLat, x.category));
     const byCatF: Record<string, string> = {};
     for (const c of new Set(inCity.map((x) => x.category))) {
       const all = inCity.filter((x) => x.category === c).length;
       byCatF[c] = `${withFicha.filter((x) => x.category === c).length}/${all}`;
     }
-    report('fichas', withFicha.length, { total: inCity.length, porCategoria: byCatF, ejemplos: withFicha.slice(0, 5).map((x) => [x.name, matchFicha(doc, x.name, x.lngLat)!.n]) });
+    const sinFicha = inCity.filter((x) => !withFicha.includes(x) && (x.category === 'education' || x.category === 'health')).slice(0, 12).map((x) => {
+      let near = doc.points[0];
+      let dm = Infinity;
+      for (const f of doc.points) { const d = Math.hypot((f.ll[0] - x.lngLat[0]) * 85_900, (f.ll[1] - x.lngLat[1]) * 111_100); if (d < dm) { dm = d; near = f; } }
+      return `${x.name} (${x.kind}) → ${near.n} a ${Math.round(dm)} m`;
+    });
+    console.log('sin ficha (muestra):\n  ' + sinFicha.join('\n  '));
+    report('fichas', withFicha.length, { total: inCity.length, porCategoria: byCatF, ejemplos: withFicha.slice(0, 5).map((x) => [x.name, matchFicha(doc, x.name, x.lngLat, x.category)!.n]) });
   });
   it('EMT: posiciones, paradas y rutas (Geoportal)', async () => {
     const buses = await fetchBusPositions();

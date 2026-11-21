@@ -58,7 +58,13 @@ export function loadFichas(): Promise<FichasDoc> {
   return cache;
 }
 
-const STOP = new Set(['de', 'del', 'la', 'el', 'les', 'los', 'las', 'i', 'y', 'en', 'a', 'd', 'l', 'centro', 'centre', 'municipal', 'publico', 'public', 'valencia']);
+const STOP = new Set([
+  'de', 'del', 'la', 'el', 'les', 'los', 'las', 'i', 'y', 'en', 'a', 'd', 'l', 'centro', 'centre', 'municipal', 'publico', 'public', 'valencia',
+  // tipologías que cada fuente escribe a su manera («CEIP» / «Colegio de Educación Infantil y Primaria»)
+  'ceip', 'cp', 'ies', 'cipfp', 'cefire', 'eoi', 'colegio', 'col', 'legi', 'instituto', 'institut', 'escuela', 'escola', 'educacion', 'educacio',
+  'infantil', 'primaria', 'secundaria', 'especial', 'cs', 'consultorio', 'auxiliar', 'salud', 'salut', 'sanitario', 'atencion', 'primaria',
+  'csmental', 'mental', 'cmss', 'servicios', 'sociales', 'serveis', 'socials', 'mayores', 'majors', 'personas', 'persones', 'actividades',
+]);
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const tokens = (s: string) => new Set(norm(s).split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !STOP.has(w)));
 
@@ -74,18 +80,26 @@ function similarity(a: string, b: string): number {
   return common / Math.min(x.size, y.size);
 }
 
+/** Categorías del mapa ↔ categorías del inventario. */
+const SAME_KIND: Record<string, string[]> = {
+  health: ['sanidad'], education: ['educacion'], social: ['social', 'mayores', 'juventud', 'empleo', 'vivienda'],
+  culture: ['cultura'], sport: ['deporte'], administration: ['atencion', 'municipal', 'justicia', 'empleo'], emergency: ['seguridad'], market: ['municipal'],
+};
+
 /**
- * Ficha del servicio: la más parecida de nombre a menos de 120 m, o la que esté
- * prácticamente en el mismo punto (< 20 m) si el nombre no ayuda.
+ * Ficha del servicio: la más parecida de nombre a menos de 120 m; si el nombre no
+ * ayuda, la que está prácticamente en el mismo punto (< 20 m) o una del mismo tipo a < 50 m.
  */
-export function matchFicha(doc: FichasDoc, name: string, at: LngLat): Ficha | undefined {
+export function matchFicha(doc: FichasDoc, name: string, at: LngLat, category?: string): Ficha | undefined {
   let best: Ficha | undefined;
   let bestScore = 0;
+  const kin = category ? SAME_KIND[category] : undefined;
   for (const f of doc.points) {
     const d = meters(at, f.ll);
     if (d > 120) continue;
     const sim = similarity(name, f.n);
-    const score = sim >= 0.5 ? 1 + sim - d / 1000 : d < 20 ? 0.5 - d / 100 : 0;
+    const sameKind = !!kin?.includes(f.c);
+    const score = sim >= 0.5 ? 1 + sim - d / 1000 : d < 20 ? 0.5 - d / 100 : sameKind && d < 50 ? 0.4 - d / 200 : 0;
     if (score > bestScore) {
       bestScore = score;
       best = f;
