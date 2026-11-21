@@ -66,6 +66,7 @@ const runtime = new CityRuntime();
  * código y se recupera poniendo SIMPLE = false.
  */
 const SIMPLE = true;
+const VIDEO_MODE = new URLSearchParams(window.location.search).has('video');
 
 /** Pantalla de móvil (mismo corte que el CSS). */
 const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches;
@@ -264,7 +265,8 @@ export default function App() {
         onBaseMap={setBaseMapOnline}
         onMapReady={(m) => {
           setMap(m);
-          if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = m;
+          // ?video: el grabador de vídeo (scripts/video.ts) mueve la cámara fotograma a fotograma
+          if (import.meta.env.DEV || VIDEO_MODE) (window as unknown as { __map: MlMap }).__map = m;
         }}
         bim={bim}
         serviceCategories={serviceCats}

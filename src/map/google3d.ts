@@ -151,6 +151,8 @@ export async function enablePhotoreal(map: MlMap, cred: PhotorealCredential, onS
             return selected;
           };
           onState({ state: 'on', credits: lastCredits });
+          // el grabador de vídeo comprueba que no quedan teselas por cargar antes de cada fotograma
+          if (new URLSearchParams(window.location.search).has('video')) (window as unknown as { __tileset: unknown }).__tileset = tileset;
         },
         onTileError: (_tile: unknown, _url: string, message: string) => {
           console.warn('Tesela 3D de Google no disponible:', message);
