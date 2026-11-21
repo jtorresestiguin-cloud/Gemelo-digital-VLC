@@ -37,3 +37,26 @@ describe('más datos en vivo', () => {
     expect(uvLevel(7)).toBe('alto');
   });
 });
+
+import { NOISE_SENSORS, parseBeaches } from './extras';
+
+describe('playas y ruido', () => {
+  it('solo playas del término de València, con su calidad en castellano', () => {
+    const r = parseBeaches([
+      { bathingWaterName: 'PLAYA DE LA MALVA-ROSA PM1', qualityStatus: 'Excellent', qualityStatus_minus1: 'Excellent', longitude: -0.3229, latitude: 39.4772 },
+      { bathingWaterName: 'PLAYA DEL CABANYAL PM1', qualityStatus: 'Good', longitude: -0.3214, latitude: 39.4678 },
+      { bathingWaterName: 'PLAYA DELS PEIXETS PM1', qualityStatus: 'Poor', longitude: -0.3231, latitude: 39.4987 },
+    ]);
+    expect(r.geo.features.map((f) => [f.properties!.name, f.properties!.label])).toEqual([['Playa de la Malva-rosa', 'Excelente'], ['Playa del Cabanyal', 'Buena']]);
+    expect(r.info).toContain('1 de 2');
+  });
+  it('los sonómetros están en Russafa', () => {
+    expect(NOISE_SENSORS.length).toBe(16);
+    for (const s of NOISE_SENSORS) {
+      expect(s.at[0]).toBeGreaterThan(-0.38);
+      expect(s.at[0]).toBeLessThan(-0.36);
+      expect(s.at[1]).toBeGreaterThan(39.45);
+      expect(s.at[1]).toBeLessThan(39.47);
+    }
+  });
+});

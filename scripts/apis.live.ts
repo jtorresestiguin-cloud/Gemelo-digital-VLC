@@ -9,6 +9,8 @@ import { fetchDistricts } from '../src/adapters/districts';
 import { fetchServices } from '../src/adapters/services';
 import { matchFicha, type FichasDoc } from '../src/adapters/fichas';
 import { readFileSync } from 'node:fs';
+import { fetchLayer } from '../src/adapters/geoportal';
+import { fetchBeaches, fetchDepartures, fetchNoise, fetchSea, fetchSky, parseForecast, parseMetro, parseParkings, parseWorks } from '../src/live/extras';
 import { fetchBusPositions, fetchRoutes, fetchStops } from '../src/transit/emt';
 import { ION_API, ION_GOOGLE_ASSET, tilesetFromIonEndpoint } from '../src/map/google3d';
 
@@ -94,5 +96,27 @@ describe('fuentes reales', () => {
     console.log(`[google] root.json HTTP ${root.status} · ${rootText.slice(0, 200)}`);
     expect(root.status).toBe(200);
     expect(JSON.parse(rootText).root).toBeTruthy();
+  });
+  it('más datos en vivo: aparcamientos, previsión, obras, metro, playas, ruido, mar, polen y UV', async () => {
+    const pk = parseParkings(await fetchLayer('Trafico/MapServer/194'));
+    report('aparcamientos', pk.geo.features.length, pk.info);
+    const fo = parseForecast(await fetchLayer('Trafico/MapServer/254'), 'ocupacion_1');
+    report('prevision', fo.geo.features.length, fo.info);
+    const wo = parseWorks(await fetchLayer('Trafico/MapServer/235', { where: 'fecha_fin_periodo >= CURRENT_TIMESTAMP AND fecha_inicio_periodo <= CURRENT_TIMESTAMP' }));
+    report('obras', wo.geo.features.length, wo.info);
+    const me = parseMetro(await fetchLayer('Trafico/MapServer/221'));
+    const deps = await fetchDepartures(String(me.geo.features[0].properties!.url));
+    report('metro', me.geo.features.length, { info: me.info, estacion: me.geo.features[0].properties!.name, trenes: deps.slice(0, 3) });
+    const be = await fetchBeaches();
+    report('playas', be.geo.features.length, { info: be.info, playas: be.geo.features.map((f) => `${f.properties!.name}: ${f.properties!.label}`) });
+    const no = await fetchNoise();
+    report('ruido', no.geo.features.length, { info: no.info, ejemplo: no.geo.features[0].properties });
+    report('mar', 1, await fetchSea());
+    report('cielo', 1, await fetchSky());
+    expect(pk.geo.features.length).toBeGreaterThan(10);
+    expect(fo.geo.features.length).toBeGreaterThan(100);
+    expect(me.geo.features.length).toBeGreaterThan(100);
+    expect(be.geo.features.length).toBeGreaterThan(5);
+    expect(no.geo.features.length).toBeGreaterThan(5);
   });
 });

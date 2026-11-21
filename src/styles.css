@@ -485,3 +485,14 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 .ficha .f-sec summary { cursor: pointer; color: var(--text); font-size: 12px; }
 .ficha .f-sec ul { margin: 6px 0 4px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .ficha .f-links { display: flex; gap: 10px; margin-top: 2px; font-size: 11.5px; }
+.live-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 8px 0 0; }
+.live-now { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); margin-bottom: 2px; }
+.live .legend .bar.dashed-o { background: repeating-linear-gradient(90deg, #fb923c 0 4px, transparent 4px 7px); }
+.live .legend .bar.dashed-y { background: repeating-linear-gradient(90deg, #fcd34d 0 4px, transparent 4px 7px); }
+.live-seg { align-self: flex-start; }
+.live-seg button { padding: 2px 9px; font-size: 11px; }
+.metro-next { margin-top: 6px; font-size: 12px; }
+.metro-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.metro-list li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; }
+.metro-list b { font-variant-numeric: tabular-nums; }
+.metro-line { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; background: #e11d48; }

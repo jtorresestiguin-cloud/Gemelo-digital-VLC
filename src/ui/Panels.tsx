@@ -107,7 +107,7 @@ const LAYER_LABELS: Partial<Record<LayerKey, string>> = {
   services: 'Servicios públicos',
   districts: 'Distritos (coloreados por alertas)', ortho: 'Ortofoto PNOA (IGN)', terrain: 'Relieve 3D',
   bim: 'Modelo BIM', buildings: 'Edificios 3D', traffic: 'Tráfico', bikes: 'Valenbisi', air: 'Calidad del aire', noise: 'Ruido (IoT)',
-  metro: 'Metro', port: 'Puerto', incidents: 'Incidencias', alerts: 'Alertas y rutas', landmarks: 'Puntos de interés', monuments: 'Monumentos',
+  metro: 'Metro', port: 'Puerto', incidents: 'Incidencias', alerts: 'Alertas y rutas', landmarks: 'Puntos de interés', monuments: 'Monumentos', parking: 'Aparcamientos', forecast: 'Previsión aparcamiento', works: 'Obras', metroLive: 'Metro', beaches: 'Playas', noiseLive: 'Ruido Russafa',
 };
 
 export function LayersPanel({ layers, onToggle, children, header }: { layers: Record<LayerKey, boolean>; onToggle: (k: LayerKey) => void; children?: React.ReactNode; header?: React.ReactNode }) {

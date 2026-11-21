@@ -4,13 +4,15 @@
  *  - Previsión de ocupación del aparcamiento regulado en calle a 1, 6, 12 y 24 h (Trafico/254, 253, 252, 4)
  *  - Obras y ocupaciones de la vía pública vigentes (Trafico/235)
  *  - Estaciones de Metrovalencia con enlace a sus próximos trenes (Trafico/221)
+ *  - Calidad de las aguas de baño de cada playa (Agencia Europea de Medio Ambiente, última temporada)
+ *  - Ruido: sonómetros de Russafa, nivel del día anterior (plataforma VLCi)
  *  - Estado del mar (temperatura del agua y oleaje) y polen + índice UV (Open-Meteo)
  */
 import type { FeatureCollection } from 'geojson';
 import { fetchLayer, type GeoCollection } from '../adapters/geoportal';
 import type { LngLat } from '../core/types';
 
-export type ExtraLayer = 'parking' | 'forecast' | 'works' | 'metro';
+export type ExtraLayer = 'parking' | 'forecast' | 'works' | 'metro' | 'beaches' | 'noise';
 export type ForecastHorizon = 1 | 6 | 12 | 24;
 
 export interface Sea { water: number; wave: number; period?: number; at: number }
@@ -117,6 +119,41 @@ export function parseMetro(g: GeoCollection): { geo: FeatureCollection; info: st
   return { geo: fc(features), info: `${features.length} estaciones · líneas ${[...lines].sort((a, b) => Number(a) - Number(b)).join(', ')}` };
 }
 
+/** Clasificación oficial de las aguas de baño (Directiva 2006/7/CE), servicio de la AEMA. */
+const EEA_YEAR = 2025;
+const EEA = `https://water.discomap.eea.europa.eu/arcgis/rest/services/BathingWater/BathingWater_Dyna_WM_${EEA_YEAR}/MapServer/3/query`;
+export const BATHING_LABEL: Record<string, string> = { Excellent: 'Excelente', Good: 'Buena', Sufficient: 'Suficiente', Poor: 'Insuficiente' };
+
+export async function fetchBeaches(): Promise<{ geo: FeatureCollection; info: string }> {
+  const p = new URLSearchParams({
+    geometry: '-0.36,39.28,-0.29,39.50', geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects',
+    outFields: 'bathingWaterName,qualityStatus,qualityStatus_minus1,qualityStatus_minus2,longitude,latitude', returnGeometry: 'false', f: 'json',
+  });
+  const j = await getJson<{ features: { attributes: Record<string, unknown> }[] }>(`${EEA}?${p}`);
+  return parseBeaches(j.features.map((f) => f.attributes));
+}
+
+export function parseBeaches(rows: Record<string, unknown>[]): { geo: FeatureCollection; info: string } {
+  const features = rows.flatMap((a) => {
+    const lng = num(a.longitude);
+    const lat = num(a.latitude);
+    // al norte de 39,485 ya es Alboraia (Patacona, Peixets)
+    if (lng === undefined || lat === undefined || lat > 39.485) return [];
+    const q = str(a.qualityStatus) ?? '';
+    const name = titleCase(str(a.bathingWaterName) ?? 'Playa').replace(/\s+Pm\d+$/i, '').replace(/ (De|Del|La|Dels|Els|Les|L') /g, (m) => m.toLowerCase()).replace(/-Rosa/, '-rosa');
+    return [{
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+      properties: {
+        kind: 'beach', name, quality: q, label: BATHING_LABEL[q] ?? (q || 'Sin clasificar'), year: EEA_YEAR,
+        history: [str(a.qualityStatus_minus1), str(a.qualityStatus_minus2)].map((x) => (x ? BATHING_LABEL[x] ?? x : '')).join(' · '),
+      },
+    }];
+  });
+  const exc = features.filter((f) => f.properties.quality === 'Excellent').length;
+  return { geo: fc(features), info: `${exc} de ${features.length} puntos con calidad excelente (temporada ${EEA_YEAR})` };
+}
+
 /** Frente a la playa de la Malva-rosa (la rejilla marina más cercana está mar adentro). */
 const SEA_AT: LngLat = [-0.31, 39.47];
 
@@ -188,6 +225,8 @@ class Extras {
         id === 'parking' ? parseParkings(await fetchLayer('Trafico/MapServer/194'))
         : id === 'works' ? parseWorks(await fetchLayer('Trafico/MapServer/235', { where: 'fecha_fin_periodo >= CURRENT_TIMESTAMP AND fecha_inicio_periodo <= CURRENT_TIMESTAMP' }))
         : id === 'metro' ? parseMetro(await fetchLayer('Trafico/MapServer/221'))
+        : id === 'beaches' ? await fetchBeaches()
+        : id === 'noise' ? await fetchNoise()
         : parseForecast(await fetchLayer(FORECAST_LAYER[this.state.horizon][0]), FORECAST_LAYER[this.state.horizon][1]);
       this.set((s) => ({ geo: { ...s.geo, [id]: r.geo }, info: { ...s.info, [id]: r.info }, updated: { ...s.updated, [id]: Date.now() }, errors: { ...s.errors, [id]: undefined } }));
     } catch (e) {
@@ -198,7 +237,7 @@ class Extras {
 
   /** Activa (o desactiva) una fuente; se refresca sola mientras esté activa. */
   enable(id: ExtraLayer | 'sea' | 'sky', on: boolean) {
-    const every = { parking: 3 * MIN, forecast: 30 * MIN, works: 60 * MIN, metro: 24 * 60 * MIN, sea: 15 * MIN, sky: 30 * MIN }[id];
+    const every = { parking: 3 * MIN, forecast: 30 * MIN, works: 60 * MIN, metro: 24 * 60 * MIN, beaches: 24 * 60 * MIN, noise: 60 * MIN, sea: 15 * MIN, sky: 30 * MIN }[id];
     if (!on) {
       clearInterval(this.timers.get(id));
       this.timers.delete(id);
@@ -231,4 +270,48 @@ export async function fetchDepartures(url: string): Promise<MetroDeparture[]> {
   const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return parseDepartures(await r.text());
+}
+
+/** Sonómetros de Russafa (plataforma VLCi): ubicación publicada en el catálogo de datos abiertos. */
+export const NOISE_SENSORS: { id: string; street: string; at: LngLat }[] = [
+  { id: 'T248680', street: 'Sueca, 32', at: [-0.3751468, 39.4613594] },
+  { id: 'T248684', street: 'Sueca, 61', at: [-0.3741152, 39.4605601] },
+  { id: 'T248683', street: 'Sueca, 2', at: [-0.3766378, 39.4633107] },
+  { id: 'T248682', street: 'Cuba, 3', at: [-0.3775977, 39.4628861] },
+  { id: 'T248655', street: 'Cádiz, 3', at: [-0.3750515, 39.4640447] },
+  { id: 'T248671', street: 'Cádiz, 16', at: [-0.3746647, 39.4631424] },
+  { id: 'T248652', street: 'Sueca esq. Dénia', at: [-0.3758885, 39.4628376] },
+  { id: 'T248672', street: 'Puerto Rico, 21', at: [-0.3761412, 39.4609867] },
+  { id: 'T248669', street: 'Doctor Serrano, 21', at: [-0.3737807, 39.4626872] },
+  { id: 'T248678', street: 'Carles Cervera, 34', at: [-0.3727962, 39.4615883] },
+  { id: 'T248677', street: 'Vivons chaflán Cádiz', at: [-0.3721407, 39.4599927] },
+  { id: 'T248679', street: 'Matías Perelló esq. Doctor Sumsi', at: [-0.3681443, 39.4614718] },
+  { id: 'T248661', street: 'General Prim chaflán Donoso Cortés', at: [-0.3704271, 39.4625622] },
+  { id: 'T248676', street: 'Salvador Abril chaflán Maestro José Serrano', at: [-0.3706022, 39.4635655] },
+  { id: 'T248670', street: 'Carles Cervera chaflán Reina Doña María', at: [-0.372886, 39.4613005] },
+  { id: 'T251234', street: 'Cura Femenía, 14', at: [-0.3732538, 39.46227] },
+];
+
+const NOISE_URL = (id: string) =>
+  `https://datosbi.vlci.valencia.es/pentaho/plugin/cda/api/doQuery?path=/public/vlci/datosabiertos/calidadambiental_sonometros_ruzafa_diarios.cda&dataAccessId=sqlSonometrosRuzafaDaily&paramid=${id}-daily&outputType=json&_TRUST_USER_=publicoda&paginateQuery=true&pageSize=1&pageStart=0`;
+
+export async function fetchNoise(): Promise<{ geo: FeatureCollection; info: string }> {
+  const rows = await Promise.all(NOISE_SENSORS.map(async (s) => {
+    try {
+      const j = await getJson<{ resultset: unknown[][] }>(NOISE_URL(s.id));
+      const r = j.resultset?.[0];
+      return r ? { s, den: num(r[5]), day: num(r[4]), evening: num(r[6]), night: num(r[7]), date: str(r[8]) } : undefined;
+    } catch {
+      return undefined;
+    }
+  }));
+  const ok = rows.filter((r): r is NonNullable<typeof r> => !!r && r.den !== undefined);
+  if (!ok.length) throw new Error('sin datos de los sonómetros');
+  const features = ok.map((r) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Point' as const, coordinates: r.s.at },
+    properties: { kind: 'noise-live', name: `Sonómetro ${r.s.street}`, den: r.den!, day: r.day ?? -1, evening: r.evening ?? -1, night: r.night ?? -1, date: r.date ?? '' },
+  }));
+  const loud = features.filter((f) => f.properties.night > 55).length;
+  return { geo: fc(features), info: `${features.length} sonómetros en Russafa${loud ? ` · ${loud} superan 55 dB de noche` : ''}` };
 }

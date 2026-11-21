@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import maplibregl, { type GeoJSONSource, type Map as MlMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Snapshot } from '../core/store';
@@ -16,12 +16,13 @@ import type { RealisticOptions, RealisticStatus } from '../realistic/RealisticLa
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import { fichaHtml, loadFichas, matchFicha } from '../adapters/fichas';
+import { extras, fetchDepartures } from '../live/extras';
 import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
 import {
   AIR_LEVELS, BIKE_COLORS, TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments';
+export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -70,6 +71,12 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
   alerts: ['vlc-alert-pulse', 'vlc-alerts', 'vlc-routes', 'vlc-route-target'],
   landmarks: ['vlc-landmarks'],
   monuments: ['vlc-monuments', 'vlc-monuments-label'],
+  parking: ['vlc-x-parking', 'vlc-x-parking-label'],
+  forecast: ['vlc-x-forecast'],
+  works: ['vlc-x-works'],
+  metroLive: ['vlc-x-metro', 'vlc-x-metro-label'],
+  beaches: ['vlc-x-beaches'],
+  noiseLive: ['vlc-x-noise', 'vlc-x-noise-label'],
 };
 
 const SEVERITY_COLOR = ['match', ['get', 'severity'], 'critical', '#dc2626', 'warning', '#f59e0b', '#3b82f6'] as unknown as string;
@@ -196,6 +203,40 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
     paint: { 'circle-color': '#111827', 'circle-radius': ['+', 5, ['*', 2, ['get', 'severity']]], 'circle-stroke-color': '#fbbf24', 'circle-stroke-width': 3 } });
   map.addLayer({ id: 'vlc-landmarks', type: 'circle', source: 'vlc-landmarks',
     paint: { 'circle-color': '#f97316', 'circle-radius': 5, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+  // Más datos en vivo (se rellenan al activarlos)
+  for (const id of ['parking', 'forecast', 'works', 'metro', 'beaches', 'noise']) map.addSource(`vlc-x-${id}`, { type: 'geojson', data: empty });
+  const hidden = { visibility: 'none' as const };
+  map.addLayer({ id: 'vlc-x-forecast', type: 'line', source: 'vlc-x-forecast', layout: { ...hidden, 'line-cap': 'round' },
+    paint: {
+      'line-color': ['interpolate', ['linear'], ['get', 'occ'], 0, '#34d399', 60, '#fbbf24', 85, '#f43f5e'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.5, 17, 5], 'line-opacity': 0.85,
+    } });
+  map.addLayer({ id: 'vlc-x-works', type: 'line', source: 'vlc-x-works', layout: { ...hidden, 'line-cap': 'butt' },
+    paint: {
+      'line-color': ['case', ['get', 'road'], '#fb923c', '#fcd34d'], 'line-dasharray': [1.2, 1],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 17, 6],
+    } });
+  map.addLayer({ id: 'vlc-x-beaches', type: 'circle', source: 'vlc-x-beaches', layout: hidden,
+    paint: {
+      'circle-color': ['match', ['get', 'quality'], 'Excellent', '#38bdf8', 'Good', '#34d399', 'Sufficient', '#fbbf24', 'Poor', '#f43f5e', '#94a3b8'],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 10], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2,
+    } });
+  map.addLayer({ id: 'vlc-x-noise', type: 'circle', source: 'vlc-x-noise', layout: hidden,
+    paint: {
+      'circle-color': ['interpolate', ['linear'], ['get', 'den'], 55, '#c4b5fd', 65, '#8b5cf6', 75, '#be185d'],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 4, 17, 9], 'circle-stroke-color': 'rgba(255,255,255,0.9)', 'circle-stroke-width': 1.5,
+    } });
+  map.addLayer({ id: 'vlc-x-parking', type: 'circle', source: 'vlc-x-parking', layout: hidden,
+    paint: {
+      'circle-color': ['case', ['!', ['get', 'live']], '#94a3b8', ['<', ['get', 'ratio'], 0.1], '#f43f5e', ['<', ['get', 'ratio'], 0.3], '#fbbf24', '#34d399'],
+      'circle-opacity': ['case', ['get', 'live'], 1, 0.6],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 11], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2,
+    } });
+  map.addLayer({ id: 'vlc-x-metro', type: 'circle', source: 'vlc-x-metro', layout: hidden,
+    paint: {
+      'circle-color': '#ffffff', 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 7],
+      'circle-stroke-color': '#e11d48', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 3.5],
+    } });
   // Monumentos de las visitas guiadas: punto discreto y nombre solo de cerca
   map.addSource('vlc-monuments', { type: 'geojson', data: monumentsGeo() });
   map.addLayer({ id: 'vlc-monuments', type: 'circle', source: 'vlc-monuments', minzoom: 12.5,
@@ -206,6 +247,14 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12.5, 1, 16, 2],
     } });
   if (map.getStyle().glyphs) {
+    const label = { 'text-size': 11, 'text-offset': [0, 1.2] as [number, number], 'text-anchor': 'top' as const, visibility: 'none' as const };
+    const halo = { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 };
+    map.addLayer({ id: 'vlc-x-parking-label', type: 'symbol', source: 'vlc-x-parking', minzoom: 13.5,
+      layout: { ...label, 'text-field': ['case', ['get', 'live'], ['concat', ['to-string', ['get', 'free']], ' libres'], ''] }, paint: halo });
+    map.addLayer({ id: 'vlc-x-metro-label', type: 'symbol', source: 'vlc-x-metro', minzoom: 14.5,
+      layout: { ...label, 'text-field': ['get', 'name'] }, paint: halo });
+    map.addLayer({ id: 'vlc-x-noise-label', type: 'symbol', source: 'vlc-x-noise', minzoom: 15,
+      layout: { ...label, 'text-field': ['concat', ['to-string', ['round', ['get', 'den']]], ' dB'] }, paint: halo });
     map.addLayer({ id: 'vlc-air-label', type: 'symbol', source: 'vlc-air', minzoom: 13, filter: ['>=', ['get', 'no2'], 0],
       layout: { 'text-field': ['concat', 'NO₂ ', ['to-string', ['get', 'no2']]], 'text-size': 11, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-allow-overlap': false },
       paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 } });
@@ -253,6 +302,18 @@ function popupHtml(p: Record<string, unknown>): string {
   const rows = (pairs: [string, unknown][]) => pairs.map(([k, v]) => `<tr><th>${k}</th><td>${esc(fmt(v))}</td></tr>`).join('');
   const title = `<strong>${esc(p.name)}</strong>`;
   switch (p.kind) {
+    case 'parking':
+      return `${title}<table>${rows(p.live ? [['Plazas libres', p.free], ['Total', p.total], ['Actualizado', new Date(Number(p.at)).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })]] : [['Plazas', p.total], ['En vivo', 'sin dato ahora']])}</table>${p.address ? `<p class="src">${esc(p.address)}</p>` : ''}<p class="src">Fuente: Ajuntament de València</p>`;
+    case 'forecast':
+      return `${title}<table>${rows([['Ocupación prevista', `${p.occ} %`]])}</table><p class="src">Previsión del aparcamiento regulado · Ajuntament de València</p>`;
+    case 'works':
+      return `${title}<table>${rows([['Ocupa', p.what], ['Desde', p.from], ['Hasta', p.to]])}</table><p class="src">Fuente: Ajuntament de València</p>`;
+    case 'beach':
+      return `${title}<table>${rows([[`Calidad del agua ${p.year}`, p.label], ...(p.history ? [['Años anteriores', p.history] as [string, unknown]] : [])])}</table><p class="src">Clasificación oficial · Agencia Europea de Medio Ambiente</p>`;
+    case 'noise-live':
+      return `${title}<table>${rows([['Día (7–19 h)', `${fmt(p.day)} dB`], ['Tarde (19–23 h)', `${fmt(p.evening)} dB`], ['Noche (23–7 h)', `${fmt(p.night)} dB`], ['Fecha', p.date]])}</table><p class="src">Sonómetros de Russafa · plataforma VLCi</p>`;
+    case 'metro-station':
+      return `${title}<div class="f-hint">Línea${String(p.lines).includes(',') ? 's' : ''} ${esc(p.lines)}</div><div class="metro-next">Consultando próximos trenes…</div><p class="src">Fuente: Metrovalencia · Geoportal de València</p>`;
     case 'service': {
       const cat = SERVICE_CATEGORIES.find((c) => c.id === p.category);
       const pairs: [string, unknown][] = [['Tipo', p.type], ['Categoría', cat?.label]];
@@ -352,7 +413,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         setReady(true);
         onMapReady?.(map!);
       });
-      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target', 'vlc-monuments', 'vlc-monuments-label'];
+      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target', 'vlc-monuments', 'vlc-monuments-label', 'vlc-x-parking', 'vlc-x-metro', 'vlc-x-beaches', 'vlc-x-noise', 'vlc-x-works', 'vlc-x-forecast'];
       // Un único manejador: ficha solo del elemento más alto bajo el puntero (los distritos quedan debajo)
       let popup: maplibregl.Popup | undefined;
       map.on('click', (e) => {
@@ -377,6 +438,32 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
             popup?.remove();
             onMonumentTourRef.current?.(b.dataset.tour!, Number(b.dataset.stop));
           }));
+          return;
+        }
+        if (props.kind === 'metro-station' && typeof props.url === 'string' && props.url) {
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', focusAfterOpen: false })
+            .setLngLat(f.geometry.type === 'Point' ? (f.geometry.coordinates as LngLat) : e.lngLat)
+            .setHTML(popupHtml(props)).addTo(map!);
+          const shown = popup;
+          fetchDepartures(props.url)
+            .then((deps) => {
+              const box = shown.getElement()?.querySelector('.metro-next');
+              if (!box) return;
+              const now = new Date();
+              const mins = (t: string) => {
+                const [h, m] = t.split(':').map(Number);
+                let d = h * 60 + m - (now.getHours() * 60 + now.getMinutes());
+                if (d < -120) d += 24 * 60;
+                return d <= 0 ? 'ahora' : `${d} min`;
+              };
+              box.innerHTML = deps.length
+                ? `<ul class="metro-list">${deps.slice(0, 6).map((d) => `<li><span class="metro-line l${d.line.replace(/\W/g, '')}">${d.line}</span><span>${d.to.replace(/[<>&]/g, '')}</span><b>${mins(d.time)}</b></li>`).join('')}</ul>`
+                : 'Sin trenes previstos ahora mismo.';
+            })
+            .catch(() => {
+              const box = shown.getElement()?.querySelector('.metro-next');
+              if (box) box.innerHTML = `<a href="${String(props.url).replace(/"/g, '')}" target="_blank" rel="noopener">Ver próximos trenes ↗</a>`;
+            });
           return;
         }
         const isService = props.kind === 'service';
@@ -410,6 +497,14 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Más datos en vivo → fuentes
+  const extra = useSyncExternalStore(extras.subscribe, extras.get);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    for (const [id, data] of Object.entries(extra.geo)) if (data) (map.getSource(`vlc-x-${id}`) as GeoJSONSource | undefined)?.setData(data);
+  }, [extra.geo, ready]);
 
   // Datos → fuentes GeoJSON
   useEffect(() => {
