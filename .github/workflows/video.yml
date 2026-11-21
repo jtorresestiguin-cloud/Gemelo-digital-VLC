@@ -1,7 +1,9 @@
 name: Vídeo para redes
 
 # Graba un vídeo del gemelo digital PUBLICADO (ciudad fotorrealista) en formato
-# horizontal (16:9) y vertical (9:16) y lo deja en la rama «videos» y como artefacto.
+# horizontal (16:9) y vertical (9:16). Sin GPU cada fotograma tarda varios segundos,
+# así que el vídeo se reparte en 18 trozos que se dibujan en paralelo; luego se une,
+# se le pone música y se deja en la rama «videos» y como artefacto.
 on:
   workflow_dispatch:
     inputs:
@@ -15,10 +17,46 @@ on:
 permissions:
   contents: write
 
+env:
+  SHARDS: 18
+
 jobs:
-  record:
+  frames:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        format: [horizontal, vertical]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm i --no-save playwright@1.63.0 tsx@4
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y -q fonts-inter || true
+      - run: npx tsx scripts/video.mts
+        env:
+          FORMAT: ${{ matrix.format }}
+          SHARD: ${{ matrix.shard }}
+          MAX_SECONDS: ${{ inputs.seconds }}
+          FPS: ${{ inputs.fps }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frames-${{ matrix.format }}-${{ matrix.shard }}
+          path: video/frames-${{ matrix.format }}/
+          retention-days: 2
+          if-no-files-found: ignore
+
+  assemble:
+    needs: frames
+    if: always()
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -32,9 +70,15 @@ jobs:
       - run: npm ci
       - run: npm i --no-save playwright@1.63.0 tsx@4
       - run: npx playwright install --with-deps chromium
-      - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg fonts-inter
+      - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: frames-${{ matrix.format }}-*
+          path: video/frames-${{ matrix.format }}
+          merge-multiple: true
       - run: npx tsx scripts/video.mts
         env:
+          MODE: assemble
           FORMAT: ${{ matrix.format }}
           MAX_SECONDS: ${{ inputs.seconds }}
           FPS: ${{ inputs.fps }}
@@ -46,12 +90,13 @@ jobs:
             video/portada-*.jpg
 
   publish:
-    needs: record
+    needs: assemble
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: video-*
           path: videos
           merge-multiple: true
       - name: Publicar en la rama «videos»

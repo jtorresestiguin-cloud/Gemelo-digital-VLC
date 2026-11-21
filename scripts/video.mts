@@ -7,7 +7,7 @@
 import { chromium, type Page } from 'playwright';
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { buildTimeline, cameraAt } from '../src/tour/camera';
 import type { Tour } from '../src/tour/tours';
 
@@ -16,7 +16,15 @@ const SHORT_URL = 'jtorresestiguin-cloud.github.io/Gemelo-digital-VLC';
 const FORMAT = process.env.FORMAT === 'vertical' ? 'vertical' : 'horizontal';
 const FPS = Number(process.env.FPS ?? 25);
 const LIMIT = Number(process.env.MAX_SECONDS ?? 0); // para pruebas cortas
+/** tamaño final del vídeo */
 const SIZE = FORMAT === 'vertical' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+/** Se dibuja a menor resolución (sin GPU cada píxel cuesta) y ffmpeg lo escala al final. */
+const K = Number(process.env.RENDER_SCALE ?? 2 / 3);
+const RENDER = { width: Math.round(SIZE.width * K), height: Math.round(SIZE.height * K) };
+const px = (n: number) => `${Math.round(n * K)}px`;
+/** El vídeo se reparte en trozos que se dibujan en paralelo (una máquina por trozo). */
+const SHARD = Number(process.env.SHARD ?? 0);
+const SHARDS = Number(process.env.SHARDS ?? 1);
 const OUT = 'video';
 const FRAMES = `${OUT}/frames-${FORMAT}`;
 
@@ -47,14 +55,14 @@ const CSS = `
 .record-exit, .monument-popup, .maplibregl-popup, .guided-card, .tour-panel { display: none !important; }
 .vid-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; font-family: Inter, system-ui, sans-serif; color: #fff; }
 .vid-shade { position: absolute; left: 0; right: 0; bottom: 0; height: 42%; background: linear-gradient(to top, rgba(2,6,23,.72), rgba(2,6,23,0)); }
-.vid-title { position: absolute; left: ${FORMAT === 'vertical' ? 64 : 88}px; right: 64px; bottom: ${FORMAT === 'vertical' ? 300 : 120}px; }
-.vid-kicker { font-size: ${FORMAT === 'vertical' ? 30 : 24}px; letter-spacing: .18em; text-transform: uppercase; color: #fbbf24; font-weight: 700; }
-.vid-name { font-size: ${FORMAT === 'vertical' ? 84 : 76}px; font-weight: 800; line-height: 1.02; margin-top: 10px; text-shadow: 0 4px 24px rgba(0,0,0,.45); }
-.vid-sub { font-size: ${FORMAT === 'vertical' ? 40 : 34}px; margin-top: 14px; opacity: .92; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
-.vid-card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 80px;
+.vid-title { position: absolute; left: ${px(FORMAT === 'vertical' ? 64 : 88)}; right: ${px(64)}; bottom: ${px(FORMAT === 'vertical' ? 300 : 120)}; }
+.vid-kicker { font-size: ${px(FORMAT === 'vertical' ? 30 : 24)}; letter-spacing: .18em; text-transform: uppercase; color: #fbbf24; font-weight: 700; }
+.vid-name { font-size: ${px(FORMAT === 'vertical' ? 84 : 76)}; font-weight: 800; line-height: 1.02; margin-top: ${px(10)}; text-shadow: 0 ${px(4)} ${px(24)} rgba(0,0,0,.45); }
+.vid-sub { font-size: ${px(FORMAT === 'vertical' ? 40 : 34)}; margin-top: ${px(14)}; opacity: .92; text-shadow: 0 ${px(2)} ${px(12)} rgba(0,0,0,.5); }
+.vid-card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 ${px(80)};
   background: radial-gradient(ellipse at center, rgba(2,6,23,.55), rgba(2,6,23,.15) 70%); }
-.vid-card .vid-name { font-size: ${FORMAT === 'vertical' ? 120 : 112}px; }
-.vid-url { margin-top: 28px; font-size: ${FORMAT === 'vertical' ? 34 : 30}px; padding: 14px 28px; border-radius: 999px; background: rgba(15,23,42,.75); border: 2px solid rgba(251,191,36,.7); }
+.vid-card .vid-name { font-size: ${px(FORMAT === 'vertical' ? 120 : 112)}; }
+.vid-url { margin-top: ${px(28)}; font-size: ${px(FORMAT === 'vertical' ? 34 : 30)}; padding: ${px(14)} ${px(28)}; border-radius: 999px; background: rgba(15,23,42,.75); border: ${px(2)} solid rgba(251,191,36,.7); }
 `;
 
 /** Peticiones de teselas de Google en curso (para saber cuándo está cargada la vista). */
@@ -135,15 +143,18 @@ async function renderMusic(seconds: number, file: string) {
 }
 
 async function main() {
-  rmSync(FRAMES, { recursive: true, force: true });
   mkdirSync(FRAMES, { recursive: true });
   const timeline = buildTimeline(VIDEO_TOUR);
   const total = LIMIT || timeline.duration;
   const nFrames = Math.round(total * FPS);
-  console.log(`[${FORMAT}] ${total.toFixed(1)} s · ${nFrames} fotogramas · ${SIZE.width}×${SIZE.height}`);
+  const per = Math.ceil(nFrames / SHARDS);
+  const from = SHARD * per;
+  const to = Math.min(nFrames, from + per);
+  console.log(`[${FORMAT}] ${total.toFixed(1)} s · fotogramas ${from}–${to - 1} de ${nFrames} · dibujo ${RENDER.width}×${RENDER.height}`);
+  if (from >= to) return;
 
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: SIZE, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: RENDER, deviceScaleFactor: 1 });
   await page.addInitScript({ content: NAME_SHIM });
   const net = trackTiles(page);
   page.on('pageerror', (e) => console.log('error en la página:', e.message));
@@ -163,16 +174,14 @@ async function main() {
     document.body.appendChild(layer);
   });
 
-  // Precarga: pasa por cada parada para llenar la caché de teselas
-  for (const s of VIDEO_TOUR.stops) {
-    await page.evaluate((c) => { (window as unknown as { __map: { jumpTo(o: unknown): void } }).__map.jumpTo(c); }, { center: s.center, zoom: s.zoom, pitch: s.pitch, bearing: s.bearing });
-    const ok = await settle(page, net, 60_000, 800);
-    console.log('precarga', s.name, ok ? 'ok' : 'incompleta');
-  }
+  // Precarga: el primer fotograma del trozo, con tiempo de sobra para llenar la caché
+  const first = cameraAt(VIDEO_TOUR, timeline, from / FPS).camera;
+  await page.evaluate((c) => { (window as unknown as { __map: { jumpTo(o: unknown): void } }).__map.jumpTo(c); }, first);
+  console.log('precarga', (await settle(page, net, 120_000, 1500)) ? 'ok' : 'incompleta');
 
   const t0 = Date.now();
   let incomplete = 0;
-  for (let i = 0; i < nFrames; i++) {
+  for (let i = from; i < to; i++) {
     const t = i / FPS;
     const frame = cameraAt(VIDEO_TOUR, timeline, t);
     const ov = overlayFor(t, total, frame);
@@ -193,29 +202,48 @@ async function main() {
       if (url) { url.textContent = ov.url; url.style.display = ov.url ? '' : 'none'; }
     }, { cam: frame.camera, ov });
     if (!(await settle(page, net, 20_000))) incomplete++;
-    await page.screenshot({ path: `${FRAMES}/f${String(i).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 92 });
-    if (i % 50 === 0) {
+    await page.screenshot({ path: `${FRAMES}/f${String(i).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 94, timeout: 180_000 });
+    if ((i - from) % 10 === 0) {
       const el = (Date.now() - t0) / 1000;
-      console.log(`fotograma ${i}/${nFrames} · ${el.toFixed(0)} s · faltan ~${((el / (i + 1)) * (nFrames - i - 1) / 60).toFixed(0)} min · incompletos ${incomplete}`);
-    }
-    if (i === Math.round((timeline.segments.find((s) => s.kind === 'hold' && s.index === 5)!.start + 2) * FPS)) {
-      await page.screenshot({ path: `${OUT}/portada-${FORMAT}.jpg`, type: 'jpeg', quality: 92 });
+      const done = i - from + 1;
+      console.log(`fotograma ${i} (${done}/${to - from}) · ${(el / done).toFixed(1)} s/fotograma · faltan ~${((el / done) * (to - i - 1) / 60).toFixed(0)} min · incompletos ${incomplete}`);
     }
   }
   await browser.close();
+  console.log(`trozo ${SHARD + 1}/${SHARDS} listo · incompletos ${incomplete}`);
+}
+
+/** Une los fotogramas de todos los trozos, añade la música y escala al tamaño final. */
+async function assemble() {
+  const timeline = buildTimeline(VIDEO_TOUR);
+  const total = LIMIT || timeline.duration;
+  const nFrames = Math.round(total * FPS);
+  // si falta algún fotograma (un trozo falló), se repite el anterior para no descuadrar el tiempo
+  let missing = 0;
+  let last = '';
+  for (let i = 0; i < nFrames; i++) {
+    const f = `${FRAMES}/f${String(i).padStart(5, '0')}.jpg`;
+    if (existsSync(f)) last = f;
+    else if (last) { copyFileSync(last, f); missing++; }
+  }
+  console.log(`[${FORMAT}] ${nFrames} fotogramas · rellenados ${missing}`);
+  const cover = Math.min(nFrames - 1, Math.round((timeline.segments.find((s) => s.kind === 'hold' && s.index === 5)!.start + 2) * FPS));
+  const scale = `scale=${SIZE.width}:${SIZE.height}:flags=lanczos`;
+  execFileSync('ffmpeg', ['-y', '-i', `${FRAMES}/f${String(cover).padStart(5, '0')}.jpg`, '-vf', scale, '-q:v', '2', `${OUT}/portada-${FORMAT}.jpg`], { stdio: 'inherit' });
 
   console.log('música…');
   await renderMusic(total, `${OUT}/musica.wav`);
   const out = `${OUT}/gemelo-digital-valencia-${FORMAT}.mp4`;
   execFileSync('ffmpeg', [
     '-y', '-framerate', String(FPS), '-i', `${FRAMES}/f%05d.jpg`, '-i', `${OUT}/musica.wav`,
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
+    '-vf', scale, '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
     '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out,
   ], { stdio: 'inherit' });
-  console.log('vídeo listo:', out, `· fotogramas incompletos: ${incomplete}`);
+  console.log('vídeo listo:', out);
 }
 
-(process.env.MUSIC_ONLY ? (mkdirSync(OUT, { recursive: true }), renderMusic(6, `${OUT}/musica-prueba.wav`)) : main()).catch((e) => {
+(process.env.MUSIC_ONLY ? (mkdirSync(OUT, { recursive: true }), renderMusic(6, `${OUT}/musica-prueba.wav`))
+  : process.env.MODE === 'assemble' ? assemble() : main()).catch((e) => {
   console.error(e);
   process.exit(1);
 });
