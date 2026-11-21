@@ -140,7 +140,7 @@ export function parseBeaches(rows: Record<string, unknown>[]): { geo: FeatureCol
     // al norte de 39,485 ya es Alboraia (Patacona, Peixets)
     if (lng === undefined || lat === undefined || lat > 39.485) return [];
     const q = str(a.qualityStatus) ?? '';
-    const name = titleCase(str(a.bathingWaterName) ?? 'Playa').replace(/\s+Pm\d+$/i, '').replace(/ (De|Del|La|Dels|Els|Les|L') /g, (m) => m.toLowerCase()).replace(/-Rosa/, '-rosa');
+    const name = titleCase(str(a.bathingWaterName) ?? 'Playa').replace(/\s+Pm\d+$/i, '').replace(/(?<= )(De|Del|La|Dels|Els|Les)(?= )/g, (m) => m.toLowerCase()).replace(/-Rosa/, '-rosa');
     return [{
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [lng, lat] },
