@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { fetchAir, fetchBikes, fetchTraffic, fetchWeather } from '../src/adapters/opendata';
 import { fetchDistricts } from '../src/adapters/districts';
 import { fetchServices } from '../src/adapters/services';
+import { matchFicha, type FichasDoc } from '../src/adapters/fichas';
+import { readFileSync } from 'node:fs';
 import { fetchBusPositions, fetchRoutes, fetchStops } from '../src/transit/emt';
 import { ION_API, ION_GOOGLE_ASSET, tilesetFromIonEndpoint } from '../src/map/google3d';
 
@@ -48,6 +50,16 @@ describe('fuentes reales', () => {
     report('servicios', s.length, byCat);
     expect(s.length).toBeGreaterThan(1000);
     expect(s.filter((x) => x.kind === 'Hospital').length).toBeGreaterThan(20);
+    // cuántos puntos del mapa tienen ficha ampliada (Mapa de Servicios Públicos CV)
+    const doc = JSON.parse(readFileSync('public/data/fichas-vlc.json', 'utf8')) as FichasDoc;
+    const inCity = s.filter((x) => x.lngLat[1] > 39.4 && x.lngLat[1] < 39.53 && x.lngLat[0] > -0.43 && x.lngLat[0] < -0.3);
+    const withFicha = inCity.filter((x) => matchFicha(doc, x.name, x.lngLat));
+    const byCatF: Record<string, string> = {};
+    for (const c of new Set(inCity.map((x) => x.category))) {
+      const all = inCity.filter((x) => x.category === c).length;
+      byCatF[c] = `${withFicha.filter((x) => x.category === c).length}/${all}`;
+    }
+    report('fichas', withFicha.length, { total: inCity.length, porCategoria: byCatF, ejemplos: withFicha.slice(0, 5).map((x) => [x.name, matchFicha(doc, x.name, x.lngLat)!.n]) });
   });
   it('EMT: posiciones, paradas y rutas (Geoportal)', async () => {
     const buses = await fetchBusPositions();

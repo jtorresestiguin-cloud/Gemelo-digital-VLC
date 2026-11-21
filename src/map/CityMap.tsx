@@ -15,6 +15,7 @@ import { enablePhotoreal, setBaseMapVisible, type PhotorealCredential, type Phot
 import type { RealisticOptions, RealisticStatus } from '../realistic/RealisticLayer';
 import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
+import { fichaHtml, loadFichas, matchFicha } from '../adapters/fichas';
 import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
 import {
   AIR_LEVELS, BIKE_COLORS, TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
@@ -365,7 +366,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         const mon = props.kind === 'monument' ? monumentById(String(props.id)) : undefined;
         if (mon) {
           // la ficha se abre encima del punto y el mapa baja el punto para que quepa entera
-          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'monument-popup', anchor: 'bottom', offset: 10 })
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'monument-popup', anchor: 'bottom', offset: 10, focusAfterOpen: false })
             .setLngLat(mon.lngLat).setHTML(monumentHtml(mon)).addTo(map!);
           const h = map!.getContainer().clientHeight;
           map!.easeTo({ center: mon.lngLat, offset: [0, Math.round(h * 0.3)], duration: 600 });
@@ -378,7 +379,24 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
           }));
           return;
         }
-        popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(popupHtml(f.properties as Record<string, unknown>)).addTo(map!);
+        const isService = props.kind === 'service';
+        popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px', focusAfterOpen: false, ...(isService ? { anchor: 'bottom' as const, offset: 8 } : {}) })
+          .setLngLat(isService && f.geometry.type === 'Point' ? (f.geometry.coordinates as LngLat) : e.lngLat).setHTML(popupHtml(f.properties as Record<string, unknown>)).addTo(map!);
+        if (isService && f.geometry.type === 'Point') {
+          // ficha completa del servicio (se descarga la primera vez; mientras, la básica)
+          const shown = popup;
+          const at = f.geometry.coordinates as LngLat;
+          loadFichas()
+            .then((doc) => {
+              const ficha = matchFicha(doc, String(props.name ?? ''), at);
+              if (!ficha || !shown.isOpen()) return;
+              shown.setMaxWidth('300px').setHTML(fichaHtml(ficha, doc)).addClassName('ficha-popup');
+              shown.setLngLat(at);
+              const h = map!.getContainer().clientHeight;
+              if (h < 900) map!.easeTo({ center: at, offset: [0, Math.round(h * 0.25)], duration: 500 });
+            })
+            .catch(() => { /* sin ficha ampliada: queda la básica */ });
+        }
       });
       for (const id of clickable) {
         map.on('mouseenter', id, () => (map!.getCanvas().style.cursor = 'pointer'));
