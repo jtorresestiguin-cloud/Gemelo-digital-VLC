@@ -15,13 +15,17 @@ jobs:
       - name: Descargar
         run: |
           mkdir -p out && cd out
-          for y in 2025 2024; do
-            curl -sSL -A "Mozilla/5.0" -o padron$y.pdf "https://www.valencia.es/estadistica/Padron/$y/Padron${y}Cast.pdf" || true
-            file padron$y.pdf
-            pdftotext -layout padron$y.pdf padron$y.txt 2>/dev/null || true
-            ls -la
+          UA="GemeloDigitalVLC/1.0 (datos abiertos; github actions)"
+          for t in "Anexo:Barrios_de_Valencia" "Distritos_de_Valencia"; do
+            curl -sSL -A "$UA" -o "wiki-es-$t.txt" "https://es.wikipedia.org/w/index.php?title=$t&action=raw" || true
           done
-          grep -n -i "barri" padron2024.txt | head -40 || true
+          curl -sSL -A "$UA" -o "wiki-ca-barris.txt" "https://ca.wikipedia.org/w/index.php?title=Llista_de_barris_de_Val%C3%A8ncia&action=raw" || true
+          curl -sSL -A "$UA" -o "wiki-ca-districtes.txt" "https://ca.wikipedia.org/w/index.php?title=Districtes_de_Val%C3%A8ncia&action=raw" || true
+          # INE: búsqueda de tablas de población por sección censal (padrón continuo)
+          curl -sSL -o ine-buscar.json "https://servicios.ine.es/wstempus/js/ES/TABLAS_OPERACION/22?det=0" || true
+          curl -sSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o padron2024.pdf "https://www.valencia.es/estadistica/Padron/2024/Padron2024Cast.pdf" || true
+          ls -la
+          head -c 600 wiki-es-Anexo:Barrios_de_Valencia.txt || true
       - name: Publicar
         run: |
           cd out
