@@ -9,6 +9,7 @@ import { fetchDistricts } from '../src/adapters/districts';
 import { fetchServices } from '../src/adapters/services';
 import { matchFicha, type FichasDoc } from '../src/adapters/fichas';
 import { readFileSync } from 'node:fs';
+import { loadFifteen, type Padron } from '../src/analysis/fifteenData';
 import { fetchLayer } from '../src/adapters/geoportal';
 import { fetchBeaches, fetchDepartures, fetchNoise, fetchSea, fetchSky, parseForecast, parseMetro, parseParkings, parseWorks } from '../src/live/extras';
 import { fetchBusPositions, fetchRoutes, fetchStops } from '../src/transit/emt';
@@ -118,5 +119,21 @@ describe('fuentes reales', () => {
     expect(me.geo.features.length).toBeGreaterThan(100);
     expect(be.geo.features.length).toBeGreaterThan(5);
     expect(no.geo.features.length).toBeGreaterThan(5);
+  });
+  it('ciudad de los 15 minutos (padrón, secciones, manzanas, zonas verdes)', async () => {
+    const services = await fetchServices();
+    const padron = JSON.parse(readFileSync('public/data/padron-2024.json', 'utf8')) as Padron;
+    const t0 = Date.now();
+    const d = await loadFifteen(services, { padron });
+    const worst = [...d.result.barrios.values()].sort((a, b) => a.avgScore - b.avgScore).slice(0, 8)
+      .map((b) => `${b.name}: ${b.avgScore.toFixed(1)}/7, todo ${b.full.toFixed(0)} %, peor ${b.weakest}`);
+    report('15min', d.result.homes.length, {
+      segundos: (Date.now() - t0) / 1000, cobertura: d.coverage, secciones: d.sections.features.length, barrios: d.result.barrios.size,
+      ciudad: { full: d.result.city.full.toFixed(1), avg: d.result.city.avgScore.toFixed(2), por: Object.fromEntries(Object.entries(d.result.city.byEssential).map(([k, v]) => [k, v.toFixed(1)])) },
+      lugares: Object.fromEntries(Object.entries(d.places).map(([k, v]) => [k, v.length])),
+      peores: worst,
+    });
+    expect(d.coverage.pop).toBeGreaterThan(0.97 * d.coverage.padron);
+    expect(d.sections.features.length).toBeGreaterThan(500);
   });
 });

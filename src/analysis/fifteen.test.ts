@@ -43,3 +43,14 @@ describe('ciudad de los 15 minutos', () => {
     expect(inRing([1.5, 0.5], sq)).toBe(false);
   });
 });
+
+import { utm30ToLngLat } from './fifteenData';
+import { meters as dist } from './fifteen';
+
+describe('coordenadas UTM del Geoportal', () => {
+  it('convierte ETRS89 UTM 30N a longitud/latitud', () => {
+    // manzana 17561 (Benimàmet): su contorno va de -0.4193 a -0.4227 y de 39.5009 a 39.5019
+    const p = utm30ToLngLat(721738.63, 4375632.76);
+    expect(dist(p, [-0.421, 39.5014])).toBeLessThan(250);
+  });
+});
