@@ -1,0 +1,313 @@
+La [[Ciutat de València]] es divideix administrativament en dènou districtes, que al seu torn es subdivideixen en huitanta-set barris i pedanies, com segueix:<ref>{{ref-notícia |títol=Mapa de los barrios y distritos de Valencia |publicació=Las Provincias |url=https://www.lasprovincias.es/valencia-ciudad/201501/27/mapa-barrios-distritos-valencia-20150127074231.html |consulta=18 desembre 2018 |data=2015-1-27}}</ref>
+{| class="wikitable sortable"
+|- align=center bgcolor="lightsteelblue"
+! #
+! Districte 
+! Extensió
+! Habitants
+! Densitat
+! Barris
+! Codi
+! Localització
+|- valign=top
+| rowspan=6 | 1
+| rowspan=6 | '''[[Ciutat Vella de València|Ciutat Vella]]'''
+| rowspan=6 | 169 ha
+| rowspan=6 | 27.983
+| rowspan=6 | 165,6
+| [[La Seu (barri de València)|La Seu]] || 1.1
+| rowspan=6 | [[Fitxer:Valencia-Distritos-Clave-Ciutat Vella.png|150px|Ciutat Vella]]
+|-
+| [[La Xerea]] || 1.2
+|-
+| [[El Carme (barri de València)|El Carme]] || 1.3
+|-
+| [[Velluters|El Pilar]] || 1.4
+|-
+| [[El Mercat]] || 1.5
+|-
+| [[Sant Francesc (barri de València)|Sant Francesc]] || 1.6
+|- bgcolor="gainsboro" valign=top
+| rowspan=3 | 2
+| rowspan=3 valign=top| '''[[L'Eixample (València)|L'Eixample]]'''
+| rowspan=3 valign=top| 173,3 ha
+| rowspan=3 valign=top| 42.672
+| rowspan=3 valign=top| 246,2
+| [[Russafa]] || 2.1
+| rowspan=3 valign=top| [[Fitxer:Valencia-Distritos-Clave-Eixample.png|150px|L'Eixample]]
+|- bgcolor="gainsboro"
+| [[El Pla del Remei]] || 2.2
+|- bgcolor="gainsboro"
+| [[Gran Via (barri de València)|Gran Via]] || 2.3
+|- valign=top
+| rowspan=4 | 3
+| rowspan=4 | '''[[Extramurs]]'''
+| rowspan=4 | 197,2 ha
+| rowspan=4 | 48.536
+| rowspan=4 | 246,1
+| [[El Botànic]] || 3.1
+| rowspan=4 | [[Fitxer:Valencia-Distritos-Clave-Extramurs.png|150px|Ciutat Vella]]
+|-
+| [[La Roqueta (barri de València)|La Roqueta]] || 3.2
+|-
+| [[La Petxina]] || 3.3
+|-
+| [[Arrancapins]] || 3.4
+|- bgcolor="gainsboro" valign=top
+| rowspan=4 | 4
+| rowspan=4 valign=top| '''[[Campanar (districte de València)|Campanar]]'''
+| rowspan=4 valign=top| 523,8 ha
+| rowspan=4 valign=top| 39.164
+| rowspan=4 valign=top| 74,8
+| [[Campanar (barri de València)|Campanar]] || 4.1
+| rowspan=4 valign=top| [[Fitxer:Valencia-Distritos-Clave-Campanar.png|150px|Campanar]]
+|- bgcolor="gainsboro"
+| [[Les Tendetes]] || 4.2
+|- bgcolor="gainsboro"
+| [[El Calvari (barri de València)|El Calvari]] || 4.3
+|- bgcolor="gainsboro"
+| [[Sant Pau (barri de València)|Sant Pau]] || 4.4
+|- valign=top
+| rowspan=5 | 5
+| rowspan=5 | '''[[La Saïdia]]'''
+| rowspan=5 | 194,4 ha
+| rowspan=5 | 47.013
+| rowspan=5 | 241,8
+| [[Marxalenes]] || 5.1
+| rowspan=5 | [[Fitxer:Valencia-Distritos-Clave-La Saïdia.png|150px|La Saïdia]]
+|-
+| [[Morvedre (barri de València)|Morvedre]] || 5.2
+|-
+| [[Trinitat (barri de València)|Trinitat]] || 5.3
+|-
+| [[Tormos (barri de València)|Tormos]] || 5.4
+|-
+| [[Sant Antoni (barri de València)|Sant Antoni]] || 5.5
+|- bgcolor="gainsboro" valign=top
+| rowspan=4 | 6
+| rowspan=4 valign=top| '''[[El Pla del Real]]'''
+| rowspan=4 valign=top| 169,3 ha
+| rowspan=4 valign=top| 30.444
+| rowspan=4 valign=top| 179,8
+| [[L'Exposició (barri de València)|L'Exposició]] || 6.1
+| rowspan=4 valign=top| [[Fitxer:Valencia-Distritos-Clave-El Pla del Real.png|150px|El Pla del Real]]
+|- bgcolor="gainsboro"
+| [[Mestalla (barri de València)|Mestalla]] || 6.2
+|- bgcolor="gainsboro"
+| [[Jaume Roig (barri de València)|Jaume Roig]] || 6.3
+|- bgcolor="gainsboro"
+| [[Ciutat Universitària (barri de València)|Ciutat Universitària]] || 6.4
+|- valign=top
+| rowspan=5 | 7
+| rowspan=5 | '''[[L'Olivereta]]'''
+| rowspan=5 | 198,9 ha
+| rowspan=5 | 48.686
+| rowspan=5 | 244,8
+| [[Nou Moles]] || 7.1
+| rowspan=5 | [[Fitxer:Valencia-Distritos-Clave-L'Olivereta.png|150px|L'Olivereta]]
+|-
+| [[Soternes]] || 7.2
+|-
+| [[Tres Forques]] || 7.3
+|-
+| [[La Fontsanta]] || 7.4
+|-
+| [[La Llum]] || 7.5
+|- bgcolor="gainsboro" valign=top
+| rowspan=5 | 8
+| rowspan=5 valign=top| '''[[Patraix (districte de València)|Patraix]]'''
+| rowspan=5 valign=top| 287,3 ha
+| rowspan=5 valign=top| 57.798
+| rowspan=5 valign=top| 201,2
+| [[Patraix (barri de València)|Patraix]] || 8.1
+| rowspan=5 valign=top| [[Fitxer:Valencia-Distritos-Clave-Patraix.png|150px|Patraix]]
+|- bgcolor="gainsboro"
+| [[Sant Isidre (barri de València)|Sant Isidre]] || 8.2
+|- bgcolor="gainsboro"
+| [[Vara de Quart]] || 8.3
+|- bgcolor="gainsboro"
+| [[Safranar]] || 8.4
+|- bgcolor="gainsboro"
+| [[Favara (barri de València)|Favara]] || 8.5
+|- valign=top
+| rowspan=5 | 9
+| rowspan=5 | '''[[Jesús (València)|Jesús]]'''
+| rowspan=5 | 298,5 ha
+| rowspan=5 | 51.941
+| rowspan=5 | 174,0
+| [[La Raïosa|La Raiosa]] || 9.1
+| rowspan=5 | [[Fitxer:Valencia-Distritos-Clave-Jesús.png|150px|Jesús]]
+|-
+| [[L'Hort de Senabre]] || 9.2
+|-
+| [[La Creu Coberta]] || 9.3
+|-
+| [[Sant Marcel·lí (barri de València)|Sant Marcel·lí]] || 9.4
+|-
+| [[Camí Real (barri de València)|Camí Real]] || 9.5
+|- bgcolor="gainsboro" valign=top
+| rowspan=7 | 10
+| rowspan=7 valign=top| '''[[Quatre Carreres]]'''
+| rowspan=7 valign=top| 1.132,5 ha
+| rowspan=7 valign=top| 74.555
+| rowspan=7 valign=top| 65,8
+| [[Montolivet (barri de València)|Montolivet]] || 10.1
+| rowspan=7 valign=top| [[Fitxer:Valencia-Distritos-Clave-Quatre Carreres.png|150px|Quatre Carreres]]
+|- bgcolor="gainsboro"
+| [[En Corts]] || 10.2
+|- bgcolor="gainsboro"
+| [[Malilla]] || 10.3
+|- bgcolor="gainsboro"
+| [[La Fonteta de Sant Lluís]] || 10.4
+|- bgcolor="gainsboro"
+| [[Na Rovella]] || 10.5
+|- bgcolor="gainsboro"
+| [[La Punta (València)|La Punta]] || 10.6
+|- bgcolor="gainsboro"
+| [[Ciutat de les Arts i les Ciències (barri de València)|Ciutat de les Arts i les Ciències]] || 10.7
+|- valign=top
+| rowspan=5 | 11
+| rowspan=5 | '''[[Poblats Marítims]]'''
+| rowspan=5 | 978,3 ha
+| rowspan=5 | 55.486
+| rowspan=5 | 56,7
+| [[El Grau de València|El Grau]] || 11.1
+| rowspan=5 | [[Fitxer:Valencia-Distritos-Clave-Poblats Marítims.png|150px|Poblats Marítims]]
+|-
+| [[El Cabanyal|El Cabanyal-Canyamelar]] || 11.2
+|-
+| [[La Malva-rosa]] || 11.3
+|-
+| [[Beteró]] || 11.4
+|-
+| [[Natzaret (barri de València)|Natzaret]] || 11.5
+|- bgcolor="gainsboro" valign=top
+| rowspan=5 | 12
+| rowspan=5 valign=top| '''[[Camins al Grau]]'''
+| rowspan=5 valign=top| 236,7 ha
+| rowspan=5 valign=top| 65.552
+| rowspan=5 valign=top| 276,9
+| [[Aiora (barri de València)|Aiora]] || 12.1
+| rowspan=5 valign=top| [[Fitxer:Valencia-Distritos-Clave-Camins al Grau.png|150px|Camins al Grau]]
+|- bgcolor="gainsboro"
+| [[Albors]] || 12.2
+|- bgcolor="gainsboro"
+| [[La Creu del Grau]] || 12.3
+|- bgcolor="gainsboro"
+| [[Camí Fondo]] || 12.4
+|- bgcolor="gainsboro"
+| [[Penya-roja (barri de València)|Penya-roja]] || 12.5
+|- valign=top
+| rowspan=5 | 13
+| rowspan=5 | '''[[Algirós]]'''
+| rowspan=5 | 295,9 ha
+| rowspan=5 | 36.390
+| rowspan=5 | 121,2
+| [[L'Illa Perduda]] || 13.1
+| rowspan=5 | [[Fitxer:Valencia-Distritos-Clave-Algirós.png|150px|Algirós]]
+|-
+| [[Ciutat Jardí (barri de València)|Ciutat Jardí]] || 13.2
+|-
+| [[L'Amistat (barri de València)|L'Amistat]] || 13.3
+|-
+| [[La Bega Baixa]] || 13.4
+|-
+| [[La Carrasca]] || 13.5
+|- bgcolor="gainsboro" valign=top
+| rowspan=2 | 14
+| rowspan=2 valign=top| '''[[Benimaclet]]'''
+| rowspan=2 valign=top| 157,0 ha
+| rowspan=2 valign=top| 28.064
+| rowspan=2 valign=top| 182,0
+| [[Benimaclet (barri de València)|Benimaclet]] || 14.1
+| rowspan=2 valign=top| [[Fitxer:Valencia-Distritos-Clave-Benimaclet.png|150px|Benimaclet]]
+|- bgcolor="gainsboro"
+| [[Camí de Vera (barri de València)|Camí de Vera]] || 14.2
+|- valign=top
+| rowspan=3 | 15
+| rowspan=3 | '''[[Rascanya]]'''
+| rowspan=3 | 262,9 ha
+| rowspan=3 | 53.566
+| rowspan=3 | 203,8
+| [[Els Orriols]] || 15.1
+| rowspan=3 | [[Fitxer:Valencia-Distritos-Clave-Rascanya.png|150px|Rascanya]]
+|-
+| [[Torrefiel]] || 15.2
+|-
+| [[Sant Llorenç (barri de València)|Sant Llorenç]] || 15.3
+|- bgcolor="gainsboro" valign=top
+| rowspan=2 | 16
+| rowspan=2 valign=top| '''[[Benicalap]]'''
+| rowspan=2 valign=top| 221,6 ha
+| rowspan=2 valign=top| 47.752
+| rowspan=2 valign=top| 215,5
+| [[Benicalap (barri de València)|Benicalap]] || 16.1
+| rowspan=2 valign=top| [[Fitxer:Valencia-Distritos-Clave-Benicalap.png|150px|Benicalap]]
+|- bgcolor="gainsboro"
+| [[Ciutat Fallera]] || 16.2
+|- valign=top
+| rowspan=7 | 17
+| rowspan=7 | '''[[Pobles del Nord]]'''
+| rowspan=7 | 1.519,6 ha
+| rowspan=7 | 6.744
+| rowspan=7 | 4,4
+| [[Benifaraig]] || 17.1
+| rowspan=7 | [[Fitxer:Poblats del Nord.png|150px|Poblats del Nord]]
+|-
+| [[Poble Nou (barri de València)|Poble Nou]] || 17.2
+|-
+| [[Carpesa]] || 17.3
+|-
+| [[Cases de Bàrcena]] || 17.4
+|-
+| [[Mauella]] ''et alii'' || 17.5
+|-
+| [[Massarrojos]] || 17.6
+|-
+| [[Borbotó]] || 17.7
+|- bgcolor="gainsboro" valign=top
+| rowspan=2 | 18
+| rowspan=2 valign=top| '''[[Pobles de l'Oest]]'''
+| rowspan=2 valign=top| 201,1 ha
+| rowspan=2 valign=top| 14.546
+| rowspan=2 valign=top| 72,3
+| [[Benimàmet]] || 18.1
+| rowspan=2 valign=top| [[Fitxer:Valencia-Distritos-Clave-Pobles del Oest.svg|150px|Poblats de l'Oest]]
+|- bgcolor="gainsboro"
+| [[Beniferri]] || 18.2
+|- valign=top
+| rowspan=8 | 19
+| rowspan=8 | '''[[Pobles del Sud (València)|Pobles del Sud]]'''
+| rowspan=8 | 6.617,6 ha
+| rowspan=8 | 21.289
+| rowspan=8 | 3,2
+| [[El Forn d'Alcedo]] || 19.1
+| rowspan=8 | [[Fitxer:Poblats del Sud.png|150px|Poblats del Sud]]
+|-
+| [[El Castellar-l'Oliveral]] || 19.2
+|-
+| [[Pinedo]] || 19.3
+|-
+| [[El Saler]] || 19.4
+|-
+| [[El Palmar (barri de València)|El Palmar]] || 19.5
+|-
+| [[El Perellonet]] || 19.6
+|-
+| [[La Torre (barri de València)|La Torre]] || 19.7
+|-
+| [[Faitanar]] || 19.8
+|}
+Dades demogràfiques obtingudes de l'Oficina d'Estadística de l'Ajuntament de València.<ref>{{ref-web|cognom=Ajuntament de València, Oficina d'estadística|url=http://www.valencia.es/ayuntamiento/catalogo.nsf/vDocumentosTituloAux/Estadistica%20Por%20territorio?opendocument&lang=1&nivel=3&bdOrigen=ayuntamiento/estadistica.nsf&idApoyo=58FB3C7A3D56E414C1257DD40057EB6C|consulta=13 novembre 2023|títol=Estadísticas por territorio|obra=Estadísticas}}</ref>
+
+== Referències ==
+{{Referències}}
+
+== Enllaços externs ==
+{{Commonscat}}
+* [http://www.ayto-valencia.es/ayuntamiento/urbanismo.nsf/fCategoriaVista?readForm&Vista=vListaPlanosWeb&Categoria=Gu%EDa%20Urbana%20por%20Barrios&titulo=Planos%20Gu%EDa%20Urbana%20por%20Barrios&lang=1&nivel=12&colApoyo=1 Plànols Guia Urbana per Barris] a la "Cartoteca Digital" de l'Ajuntament de València
+* [http://www.valencia.es/ayuntamiento/webs/estadistica/Anuario/2016/XLS_Val/Cap02.xlsx Superfície, Densitat i Població per barris i districtes l'any 2016]
+
+{{Barris de València}}
+
+[[Categoria:Districtes de València| ]]
