@@ -9,6 +9,8 @@ import { BimPanel, type BimModel } from './ui/BimPanel';
 import { ServicesPanel } from './ui/ServicesPanel';
 import { EXTRA_SOURCE, LivePanel } from './ui/LivePanel';
 import { extras } from './live/extras';
+import { FifteenPanel } from './ui/FifteenPanel';
+import { fifteen } from './analysis/fifteenData';
 import { CURATED_TOURS } from './tour/curated';
 import { SERVICE_CATEGORIES } from './adapters/services';
 import type { ServiceCategory } from './core/types';
@@ -79,7 +81,7 @@ const ALL_LAYERS: Record<LayerKey, boolean> = {
   emtBuses: false, emtBuses3d: false, emtLabels: false, emtTrails: false, emtRoutes: false, emtStops: false,
   services: false, districts: false, ortho: false, terrain: false, bim: !SIMPLE,
   buildings: !SIMPLE, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false, monuments: true,
-  parking: false, forecast: false, works: false, metroLive: false, beaches: false, noiseLive: false,
+  parking: false, forecast: false, works: false, metroLive: false, beaches: false, noiseLive: false, fifteen: false,
 };
 /** Al encender los autobuses se encienden también sus complementos (etiquetas, estelas, 3D). */
 const EMT_SET: LayerKey[] = ['emtBuses', 'emtBuses3d', 'emtLabels', 'emtTrails'];
@@ -158,6 +160,11 @@ export default function App() {
       setDroneCtl(undefined);
     };
   }, [map, drone]);
+
+  // el análisis de 15 minutos se calcula al activarlo, en cuanto están cargados los servicios
+  useEffect(() => {
+    if (layers.fifteen && snapshot.state.services.length) void fifteen.start(snapshot.state.services);
+  }, [layers.fifteen, snapshot.state.services]);
 
   const startGuided = (tour: Tour, stop = 0) => {
     if (!map) return;
@@ -430,6 +437,21 @@ export default function App() {
                 const extra = EXTRA_SOURCE[k];
                 if (extra) extras.enable(extra, on);
                 else if (on) runtime.enableLive(k as 'traffic' | 'air' | 'bikes');
+              }}
+            />
+          )}
+          {SIMPLE && (
+            <FifteenPanel
+              on={layers.fifteen}
+              onToggle={() => setLayers((l) => ({ ...l, fifteen: !l.fifteen }))}
+              onBarrio={(name) => {
+                const f = fifteen.get().data?.barriosGeo.features.find((x) => x.properties?.name === name);
+                if (!map || !f?.geometry || (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon')) return;
+                const pts = (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates).flat(2) as [number, number][];
+                const lng = pts.map((p) => p[0]);
+                const lat = pts.map((p) => p[1]);
+                map.fitBounds([[Math.min(...lng), Math.min(...lat)], [Math.max(...lng), Math.max(...lat)]], { padding: 60, pitch: 45, duration: 1500 });
+                if (isMobile()) setCollapsed(true);
               }}
             />
           )}

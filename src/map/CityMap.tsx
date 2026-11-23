@@ -17,12 +17,14 @@ import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import { fichaHtml, loadFichas, matchFicha } from '../adapters/fichas';
 import { extras, fetchDepartures } from '../live/extras';
+import { fifteen } from '../analysis/fifteenData';
+import { ESSENTIALS, LIMIT_MIN, walkMinutes } from '../analysis/fifteen';
 import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
 import {
   AIR_LEVELS, BIKE_COLORS, TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive';
+export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive' | 'fifteen';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -71,6 +73,7 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
   alerts: ['vlc-alert-pulse', 'vlc-alerts', 'vlc-routes', 'vlc-route-target'],
   landmarks: ['vlc-landmarks'],
   monuments: ['vlc-monuments', 'vlc-monuments-label'],
+  fifteen: ['vlc-15-sections', 'vlc-15-barrios', 'vlc-15-lines', 'vlc-15-dest'],
   parking: ['vlc-x-parking', 'vlc-x-parking-label'],
   forecast: ['vlc-x-forecast'],
   works: ['vlc-x-works'],
@@ -113,6 +116,16 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
     } }, firstLine);
   map.addLayer({ id: 'vlc-districts-line', type: 'line', source: 'vlc-districts',
     paint: { 'line-color': '#334155', 'line-width': 1.2, 'line-dasharray': [3, 2], 'line-opacity': 0.7 } }, firstLine);
+  // Análisis «ciudad de los 15 minutos»: secciones censales coloreadas, barrios y líneas al servicio más cercano
+  for (const id of ['15-sections', '15-barrios', '15-lines', '15-dest']) map.addSource(`vlc-${id}`, { type: 'geojson', data: empty });
+  map.addLayer({ id: 'vlc-15-sections', type: 'fill', source: 'vlc-15-sections', layout: { visibility: 'none' },
+    paint: { 'fill-color': '#94a3b8', 'fill-opacity': 0.42, 'fill-outline-color': 'rgba(255,255,255,0.15)' } }, firstLine);
+  map.addLayer({ id: 'vlc-15-barrios', type: 'line', source: 'vlc-15-barrios', layout: { visibility: 'none' },
+    paint: { 'line-color': '#f8fafc', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.6, 15, 1.6], 'line-opacity': 0.55 } }, firstLine);
+  map.addLayer({ id: 'vlc-15-lines', type: 'line', source: 'vlc-15-lines', layout: { visibility: 'none', 'line-cap': 'round' },
+    paint: { 'line-color': ['case', ['get', 'ok'], '#34d399', '#f43f5e'], 'line-width': 2, 'line-dasharray': [1.5, 1.5], 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'vlc-15-dest', type: 'circle', source: 'vlc-15-dest', layout: { visibility: 'none' },
+    paint: { 'circle-radius': 5, 'circle-color': ['case', ['get', 'ok'], '#34d399', '#f43f5e'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
 
   for (const id of ['services', 'traffic', 'bikes', 'air', 'noise', 'metro', 'port', 'incidents', 'alerts', 'landmarks']) {
     map.addSource(`vlc-${id}`, { type: 'geojson', data: empty });
@@ -373,6 +386,8 @@ interface Props {
 }
 
 export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, bim, serviceCategories, theme, orbit, camera, busColorMode, photorealCred, onPhotoreal, realistic, onRealistic, onMonumentTour }: Props) {
+  const fifteenOnRef = useRef(layers.fifteen);
+  fifteenOnRef.current = layers.fifteen;
   const onMonumentTourRef = useRef(onMonumentTour);
   onMonumentTourRef.current = onMonumentTour;
   const container = useRef<HTMLDivElement>(null);
@@ -423,6 +438,34 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         popup?.remove();
         const props = (f?.properties ?? {}) as Record<string, unknown>;
         highlightLine(map!, props.kind === 'bus' ? String(props.line) : null);
+        const fs = fifteen.get();
+        if (!f && fifteenOnRef.current && fs.index) {
+          // «¿qué tengo a 15 minutos desde aquí?»
+          const at: LngLat = [e.lngLat.lng, e.lngLat.lat];
+          const rows = ESSENTIALS.map((es) => {
+            const n = fs.index![es.id].nearest(at);
+            const min = n ? walkMinutes(n.m) : Infinity;
+            return { es, n, min, ok: min <= LIMIT_MIN };
+          });
+          const okN = rows.filter((r) => r.ok).length;
+          const lines: GeoJSON.Feature[] = rows.filter((r) => r.n).map((r) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: [at, r.n!.place.at] }, properties: { ok: r.ok } }));
+          const dest: GeoJSON.Feature[] = rows.filter((r) => r.n).map((r) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: r.n!.place.at }, properties: { ok: r.ok } }));
+          (map!.getSource('vlc-15-lines') as GeoJSONSource).setData({ type: 'FeatureCollection', features: lines });
+          (map!.getSource('vlc-15-dest') as GeoJSONSource).setData({ type: 'FeatureCollection', features: dest });
+          const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+          const fmtMin = (m: number) => (Number.isFinite(m) ? `${Math.max(1, Math.round(m))} min` : '—');
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', focusAfterOpen: false, className: 'f15-popup' })
+            .setLngLat(e.lngLat)
+            .setHTML(`<strong>A pie desde aquí</strong><div class="f15-score ${okN === 7 ? 'good' : okN >= 5 ? 'mid' : 'bad'}">${okN} de 7 servicios esenciales a menos de ${LIMIT_MIN} min</div>`
+              + `<ul class="f15-list">${rows.map((r) => `<li class="${r.ok ? 'ok' : 'ko'}"><span>${r.es.icon}</span><span><b>${r.es.label}</b><i>${esc(r.n?.place.name ?? 'sin datos')}</i></span><em>${fmtMin(r.min)}</em></li>`).join('')}</ul>`
+              + `<p class="src">Estimación: línea recta × 1,3 a 4,8 km/h</p>`)
+            .addTo(map!);
+          popup.on('close', () => {
+            (map!.getSource('vlc-15-lines') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
+            (map!.getSource('vlc-15-dest') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
+          });
+          return;
+        }
         if (!f) return;
         const mon = props.kind === 'monument' ? monumentById(String(props.id)) : undefined;
         if (mon) {
@@ -497,6 +540,23 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Análisis 15 minutos → fuentes y colores
+  const f15 = useSyncExternalStore(fifteen.subscribe, fifteen.get);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !f15.data) return;
+    (map.getSource('vlc-15-sections') as GeoJSONSource | undefined)?.setData(f15.data.sections);
+    (map.getSource('vlc-15-barrios') as GeoJSONSource | undefined)?.setData(f15.data.barriosGeo);
+  }, [f15.data, ready]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map?.getLayer('vlc-15-sections')) return;
+    const color = f15.mode === 'score'
+      ? ['interpolate', ['linear'], ['get', 'score'], 3, '#f43f5e', 5, '#fbbf24', 6.3, '#a3e635', 7, '#34d399']
+      : ['interpolate', ['linear'], ['get', `m_${f15.mode}`], 8, '#34d399', 15, '#fbbf24', 25, '#f43f5e'];
+    map.setPaintProperty('vlc-15-sections', 'fill-color', color as unknown as string);
+  }, [f15.mode, ready]);
 
   // Más datos en vivo → fuentes
   const extra = useSyncExternalStore(extras.subscribe, extras.get);

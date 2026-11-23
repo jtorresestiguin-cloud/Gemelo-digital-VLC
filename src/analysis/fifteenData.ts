@@ -9,7 +9,7 @@
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { GEOPORTAL } from '../adapters/geoportal';
 import type { LngLat, PublicService } from '../core/types';
-import { ESSENTIALS, analyzeFifteen, inRing, type Essential, type FifteenResult, type Home, type Place } from './fifteen';
+import { ESSENTIALS, NearestIndex, analyzeFifteen, inRing, type Essential, type FifteenResult, type Home, type Place } from './fifteen';
 
 const U = `${GEOPORTAL}/UrbanismoEInfraestructuras/MapServer`;
 const M = `${GEOPORTAL}/MedioAmbiente/MapServer`;
@@ -235,3 +235,41 @@ export async function loadFifteen(services: PublicService[], opts: { padron?: Pa
 }
 
 
+
+/** Estado compartido del análisis (panel y mapa). */
+export type FifteenMode = 'score' | Essential;
+export interface FifteenState {
+  status: 'off' | 'loading' | 'ready' | 'error';
+  data?: FifteenData;
+  index?: Record<Essential, NearestIndex>;
+  mode: FifteenMode;
+  error?: string;
+}
+
+class FifteenStore {
+  private state: FifteenState = { status: 'off', mode: 'score' };
+  private listeners = new Set<() => void>();
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  };
+  get = () => this.state;
+  private set(p: Partial<FifteenState>) {
+    this.state = { ...this.state, ...p };
+    this.listeners.forEach((l) => l());
+  }
+  setMode(mode: FifteenMode) { this.set({ mode }); }
+  async start(services: PublicService[]) {
+    if (this.state.status === 'loading' || this.state.status === 'ready') return;
+    this.set({ status: 'loading', error: undefined });
+    try {
+      const data = await loadFifteen(services);
+      const index = Object.fromEntries(ESSENTIALS.map((e) => [e.id, new NearestIndex(data.places[e.id])])) as Record<Essential, NearestIndex>;
+      this.set({ status: 'ready', data, index });
+    } catch (e) {
+      this.set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+}
+
+export const fifteen = new FifteenStore();
