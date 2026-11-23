@@ -119,7 +119,7 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
   // Análisis «ciudad de los 15 minutos»: secciones censales coloreadas, barrios y líneas al servicio más cercano
   for (const id of ['15-sections', '15-barrios', '15-lines', '15-dest']) map.addSource(`vlc-${id}`, { type: 'geojson', data: empty });
   map.addLayer({ id: 'vlc-15-sections', type: 'fill', source: 'vlc-15-sections', layout: { visibility: 'none' },
-    paint: { 'fill-color': '#94a3b8', 'fill-opacity': 0.42, 'fill-outline-color': 'rgba(255,255,255,0.15)' } }, firstLine);
+    paint: { 'fill-color': '#94a3b8', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.5, 15, 0.32, 17, 0.2], 'fill-outline-color': 'rgba(255,255,255,0.15)' } }, firstLine);
   map.addLayer({ id: 'vlc-15-barrios', type: 'line', source: 'vlc-15-barrios', layout: { visibility: 'none' },
     paint: { 'line-color': '#f8fafc', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.6, 15, 1.6], 'line-opacity': 0.55 } }, firstLine);
   map.addLayer({ id: 'vlc-15-lines', type: 'line', source: 'vlc-15-lines', layout: { visibility: 'none', 'line-cap': 'round' },
@@ -454,12 +454,14 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
           (map!.getSource('vlc-15-dest') as GeoJSONSource).setData({ type: 'FeatureCollection', features: dest });
           const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
           const fmtMin = (m: number) => (Number.isFinite(m) ? `${Math.max(1, Math.round(m))} min` : '—');
-          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', focusAfterOpen: false, className: 'f15-popup' })
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', focusAfterOpen: false, className: 'f15-popup', anchor: 'bottom', offset: 8 })
             .setLngLat(e.lngLat)
             .setHTML(`<strong>A pie desde aquí</strong><div class="f15-score ${okN === 7 ? 'good' : okN >= 5 ? 'mid' : 'bad'}">${okN} de 7 servicios esenciales a menos de ${LIMIT_MIN} min</div>`
               + `<ul class="f15-list">${rows.map((r) => `<li class="${r.ok ? 'ok' : 'ko'}"><span>${r.es.icon}</span><span><b>${r.es.label}</b><i>${esc(r.n?.place.name ?? 'sin datos')}</i></span><em>${fmtMin(r.min)}</em></li>`).join('')}</ul>`
               + `<p class="src">Estimación: línea recta × 1,3 a 4,8 km/h</p>`)
             .addTo(map!);
+          // el punto baja para que la ficha quepa entera por encima
+          map!.easeTo({ center: e.lngLat, offset: [0, Math.round(map!.getContainer().clientHeight * 0.28)], duration: 500 });
           popup.on('close', () => {
             (map!.getSource('vlc-15-lines') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
             (map!.getSource('vlc-15-dest') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });

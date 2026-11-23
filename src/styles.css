@@ -499,7 +499,7 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 
 /* Análisis: ciudad de los 15 minutos */
 .fifteen .f15-head { display: flex; gap: 8px; align-items: baseline; font-size: 12px; line-height: 1.35; }
-.fifteen .f15-head b { font-size: 22px; font-weight: 800; }
+.fifteen .f15-head b { font-size: 22px; font-weight: 800; white-space: nowrap; }
 .fifteen .good { color: #34d399; } .fifteen .mid { color: #fbbf24; } .fifteen .bad { color: #f43f5e; }
 .f15-bars { display: flex; flex-direction: column; gap: 3px; }
 .f15-bar { display: grid; grid-template-columns: 1fr 70px 38px; gap: 8px; align-items: center; background: none; border: 1px solid transparent; border-radius: 6px; color: var(--text); font: inherit; font-size: 11.5px; padding: 2px 4px; cursor: pointer; text-align: left; }
@@ -520,3 +520,5 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 .f15-list li i { font-style: normal; color: var(--muted); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f15-list li em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 .f15-list li.ok em { color: #34d399; } .f15-list li.ko em { color: #f43f5e; }
+
+.f15-popup .maplibregl-popup-content { max-height: 60vh; overflow-y: auto; }
