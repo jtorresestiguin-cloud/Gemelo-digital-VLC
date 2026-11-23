@@ -84,6 +84,25 @@ if (metro) {
   console.log('Ficha metro:', await page.locator('.maplibregl-popup').innerText().catch(() => ''));
 }
 console.log('Más capas:', await page.locator('.live').innerText().catch(() => ''));
+// Análisis «ciudad de los 15 minutos»: se apagan las capas en vivo y se enciende el análisis
+for (const t of ['Aparcamientos públicos', 'Obras', 'Metro', 'Ruido', 'Playas']) await page.locator('.live .switch', { hasText: t }).click().catch(() => {});
+await page.locator('.fifteen .switch').click().catch(() => console.log('sin interruptor 15 min'));
+await page.waitForFunction(() => document.querySelector('.f15-head'), null, { timeout: 120_000 }).catch(() => console.log('el análisis no terminó'));
+await page.waitForTimeout(5000);
+await shot('13-15min-panel.png');
+console.log('15 minutos:', await page.locator('.fifteen').innerText().catch(() => ''));
+await page.click('.goto >> text=Toda la ciudad');
+await page.waitForTimeout(30_000);
+await page.keyboard.press('r');
+await page.waitForTimeout(1000);
+await shot('14-15min-ciudad.png');
+await page.keyboard.press('r');
+await page.click('.goto >> text=Campanar');
+await page.waitForTimeout(25_000);
+await page.mouse.click(480, 420);
+await page.waitForTimeout(3000);
+await shot('15-15min-punto.png');
+console.log('Desde un punto:', await page.locator('.f15-popup').innerText().catch(() => 'sin ficha'));
 writeFileSync(`${OUT}/stats.json`, JSON.stringify(stats, null, 2));
 console.log(JSON.stringify(stats, null, 2));
 await browser.close();
