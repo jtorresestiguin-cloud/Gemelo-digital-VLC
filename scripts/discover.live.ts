@@ -13,25 +13,18 @@ async function probe(label: string, url: string, show = 1500) {
   }
 }
 
-it('15 minutos', async () => {
+it('15 minutos: población', async () => {
   const U = 'https://geoportal.valencia.es/server/rest/services/OPENDATA/UrbanismoEInfraestructuras/MapServer';
-  const M = 'https://geoportal.valencia.es/server/rest/services/OPENDATA/MedioAmbiente/MapServer';
-  for (const [l, base] of [['224', U], ['215', U], ['8', M]] as const) {
-    const meta = await probe(`meta ${l}`, `${base}/${l}?f=json`, 0);
+  const meta = await probe('meta 210 secciones', `${U}/210?f=json`, 0);
+  try { console.log((JSON.parse(meta).fields ?? []).map((f: { name: string }) => f.name).join(', ')); } catch { /* */ }
+  await probe('muestra 210', `${U}/210/query?where=1%3D1&outFields=*&returnGeometry=false&resultRecordCount=2&f=json`, 1200);
+  for (const q of ['poblacion barrios', 'padron barrio', 'padro barris', 'població barri', 'habitantes barrio', 'poblacion seccion censal']) {
+    const t = await probe(`CKAN ${q}`, `https://opendata.vlci.valencia.es/api/3/action/package_search?q=${encodeURIComponent(q)}&rows=8`, 0);
     try {
-      const j = JSON.parse(meta);
-      console.log(`${j.name} · ${j.geometryType} · maxRecord ${j.maxRecordCount} · centroid ${j.supportsReturningGeometryCentroid ?? j.advancedQueryCapabilities?.supportsReturningGeometryCentroid}`);
-      console.log((j.fields ?? []).map((f: { name: string; type: string }) => `${f.name}:${f.type}`).join(', '));
+      for (const p of JSON.parse(t).result.results as { name: string; title: string; metadata_modified: string; resources: { format: string; url: string; name: string }[] }[]) {
+        console.log(`* ${p.name} · ${p.title} · ${p.metadata_modified.slice(0, 10)}`);
+        for (const r of p.resources.slice(0, 3)) console.log(`   - ${r.format} ${r.name} ${r.url}`);
+      }
     } catch { /* */ }
-    await probe(`count ${l}`, `${base}/${l}/query?where=1%3D1&returnCountOnly=true&f=json`, 200);
-    await probe(`muestra ${l}`, `${base}/${l}/query?where=1%3D1&outFields=*&returnGeometry=false&resultRecordCount=3&f=json`, 1500);
-    await probe(`centroides ${l}`, `${base}/${l}/query?where=1%3D1&outFields=objectid&returnGeometry=false&returnCentroid=true&outSR=4326&resultRecordCount=2&f=json`, 700);
   }
-  // tamaño real de las manzanas con población, simplificadas, en GeoJSON
-  const t = await probe('manzanas geojson simplificado (1000)', `${U}/215/query?where=1%3D1&outFields=*&outSR=4326&maxAllowableOffset=0.00005&geometryPrecision=5&resultRecordCount=1000&f=geojson`, 600);
-  console.log('bytes por 1000 manzanas:', t.length);
-  const b = await probe('barrios geojson simplificado', `${U}/224/query?where=1%3D1&outFields=*&outSR=4326&maxAllowableOffset=0.0001&geometryPrecision=5&f=geojson`, 400);
-  console.log('bytes barrios:', b.length);
-  const v = await probe('verdes geojson (1000)', `${M}/8/query?where=1%3D1&outFields=*&outSR=4326&maxAllowableOffset=0.00005&geometryPrecision=5&resultRecordCount=1000&f=geojson`, 600);
-  console.log('bytes 1000 verdes:', v.length);
 });
