@@ -1,0 +1,33 @@
+name: Datos del padrón (temporal)
+
+# Descarga el padrón por barrios publicado por la Oficina d'Estadística y lo deja en la rama «datos-tmp».
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  padron:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+      - name: Descargar
+        run: |
+          mkdir -p out && cd out
+          for y in 2025 2024; do
+            curl -sSL -A "Mozilla/5.0" -o padron$y.pdf "https://www.valencia.es/estadistica/Padron/$y/Padron${y}Cast.pdf" || true
+            file padron$y.pdf
+            pdftotext -layout padron$y.pdf padron$y.txt 2>/dev/null || true
+            ls -la
+          done
+          grep -n -i "barri" padron2024.txt | head -40 || true
+      - name: Publicar
+        run: |
+          cd out
+          git init -q -b datos-tmp
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -q -m "padrón"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" datos-tmp
