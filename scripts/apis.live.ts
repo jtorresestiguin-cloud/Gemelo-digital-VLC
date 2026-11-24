@@ -15,6 +15,9 @@ import { fetchBeaches, fetchDepartures, fetchNoise, fetchSea, fetchSky, parseFor
 import { fetchBusPositions, fetchRoutes, fetchStops } from '../src/transit/emt';
 import { ION_API, ION_GOOGLE_ASSET, tilesetFromIonEndpoint } from '../src/map/google3d';
 
+// @ts-expect-error módulo JS del intermediario (Cloudflare Worker), sin tipos
+import { buildPayload } from '../cloudflare/cercanias-worker.js';
+
 const report = (name: string, n: number, sample: unknown) => console.log(`[${name}] ${n} elementos · ${JSON.stringify(sample).slice(0, 250)}`);
 
 describe('fuentes reales', () => {
@@ -138,5 +141,14 @@ describe('fuentes reales', () => {
     console.log('15min mejores:', [...d.result.barrios.values()].sort((a, b) => b.full - a.full).slice(0, 5).map((b) => `${b.name} ${b.full.toFixed(0)} %`).join(' · '));
     expect(d.coverage.pop).toBeGreaterThan(0.97 * d.coverage.padron);
     expect(d.sections.features.length).toBeGreaterThan(500);
+  });
+  it('Cercanías València en vivo (Renfe GTFS-RT, mismo filtro que el intermediario)', async () => {
+    const get = async (u: string) => (await fetch(u)).json();
+    const [v, t, a] = await Promise.all(['vehicle_positions', 'trip_updates', 'alerts'].map((f) => get(`https://gtfsrt.renfe.com/${f}.json`)));
+    const p = buildPayload(v, t, a);
+    report('cercanías', p.trains.length, { cancelados: p.cancelled, avisos: p.notices, ejemplo: p.trains[0] });
+    // de madrugada no circula ningún tren: basta con que el fichero se lea
+    expect(Array.isArray(p.trains)).toBe(true);
+    expect(p.updated).toBeGreaterThan(Date.now() - 3600_000);
   });
 });
