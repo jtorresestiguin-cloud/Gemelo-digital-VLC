@@ -31,6 +31,39 @@ const shot = async (file) => {
   }
 };
 await shot('01-inicio.png');
+
+// Captura rápida solo de Cercanías (ONLY=cercanias): capa, ficha de una estación y de un tren
+if (process.env.ONLY === 'cercanias') {
+  await page.locator('.live .switch', { hasText: 'Cercanías' }).click();
+  await page.waitForTimeout(8000);
+  console.log('Panel:', await page.locator('.live-row.on').innerText().catch(() => ''));
+  await page.evaluate(() => window.__map.jumpTo({ center: [-0.42, 39.45], zoom: 10.2, pitch: 0, bearing: 0 }));
+  await page.waitForTimeout(20_000);
+  await page.keyboard.press('r');
+  await page.waitForTimeout(1000);
+  await shot('c1-cercanias-area.png');
+  await page.keyboard.press('r');
+  for (const [file, name] of [['c2-ficha-nord.png', 'València-Estació del Nord'], ['c3-ficha-silla.png', 'Silla']]) {
+    const at = await page.evaluate((n) => {
+      const m = window.__map;
+      const src = m.getSource('vlc-cer-stations')._data;
+      const f = (src.features ?? []).find((x) => x.properties.name === n);
+      if (!f) return null;
+      m.jumpTo({ center: f.geometry.coordinates, zoom: 15, pitch: 0, bearing: 0 });
+      return f.geometry.coordinates;
+    }, name);
+    await page.waitForTimeout(15_000);
+    const pt = at && (await page.evaluate((c) => window.__map.project(c), at));
+    if (!pt) { console.log('sin estación', name); continue; }
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(5000);
+    await shot(file);
+    console.log(`Ficha ${name}:`, await page.locator('.maplibregl-popup').innerText().catch(() => ''));
+  }
+  console.log('Errores:', stats.errors.slice(0, 10));
+  await browser.close();
+  process.exit(0);
+}
 console.log('Aviso en pantalla:', await page.locator('.toast').allInnerTexts().catch(() => []));
 
 for (const [name, label] of [['02-centro', 'Centro'], ['03-ciutat-arts', 'Ciutat de les Arts'], ['04-port', 'Port']]) {

@@ -4,6 +4,10 @@ name: Capturas de la web
 # capturas en la rama «capturas» (para revisar el aspecto real sin abrir la web).
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: 'Solo una parte (p. ej. cercanias); vacío = todas las capturas'
+        default: ''
 
 permissions:
   contents: write
@@ -19,6 +23,8 @@ jobs:
       - run: npm i --no-save playwright@1.63.0
       - run: npx playwright install --with-deps chromium
       - run: node scripts/capture.mjs
+        env:
+          ONLY: ${{ inputs.only }}
         timeout-minutes: 25
       - name: Publicar capturas en la rama «capturas»
         if: always()
