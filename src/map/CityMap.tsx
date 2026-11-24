@@ -17,7 +17,7 @@ import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import { fichaHtml, loadFichas, matchFicha } from '../adapters/fichas';
 import { extras, fetchDepartures } from '../live/extras';
-import { cercanias, noticesFor } from '../live/cercanias';
+import { cercanias, madridNow, noticesFor } from '../live/cercanias';
 import { fifteen } from '../analysis/fifteenData';
 import { ESSENTIALS, LIMIT_MIN, walkMinutes } from '../analysis/fifteen';
 import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
@@ -351,11 +351,8 @@ function popupHtml(p: Record<string, unknown>): string {
       const lines = String(p.lines).split(', ');
       const color = new Map(c.data?.lines.map((l) => [l.line, l.color]));
       const chips = lines.map((l) => `<span class="cer-chip" style="background:${esc(color.get(l) ?? '#64748b')}">${esc(l)}</span>`).join('');
-      const coming = (c.live?.trains ?? []).filter((t) => t.stop === p.id);
       const notes = noticesFor(c.live?.notices ?? [], lines);
-      const st = (s: string) => (s === 'STOPPED_AT' ? 'en la estación' : s === 'INCOMING_AT' ? 'llegando' : 'en camino');
-      return `${title}<div class="cer-chips">${chips}</div>`
-        + (coming.length ? `<ul class="metro-list">${coming.map((t) => `<li><span class="cer-chip" style="background:${esc(color.get(t.line) ?? '#64748b')}">${esc(t.line)}</span><span>Tren ${esc(t.id)} · ${st(t.status)}</span><b>${t.delay ? `+${t.delay} min` : t.delay === 0 ? 'puntual' : ''}</b></li>`).join('')}</ul>` : '')
+      return `${title}<div class="cer-chips">${chips}</div><div class="metro-next cer-next">Consultando próximos trenes…</div>`
         + notes.map((n) => `<div class="cer-notice">⚠ ${esc(n.text)}</div>`).join('')
         + `<a class="cer-link" href="https://www.renfe.com/es/es/cercanias/cercanias-valencia/horarios" target="_blank" rel="noopener">Horarios en Renfe ↗</a>`
         + `<p class="src">Fuente: Renfe (datos abiertos, CC BY 4.0)</p>`;
@@ -527,6 +524,30 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
             popup?.remove();
             onMonumentTourRef.current?.(b.dataset.tour!, Number(b.dataset.stop));
           }));
+          return;
+        }
+        if (props.kind === 'cer-station') {
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', focusAfterOpen: false })
+            .setLngLat(f.geometry.type === 'Point' ? (f.geometry.coordinates as LngLat) : e.lngLat)
+            .setHTML(popupHtml(props)).addTo(map!);
+          const shown = popup;
+          void cercanias.departures(String(props.id)).then((deps) => {
+            const box = shown.getElement()?.querySelector('.cer-next');
+            if (!box) return;
+            if (!deps) { box.innerHTML = 'Horario no disponible ahora mismo.'; return; }
+            const color = new Map(cercanias.get().data?.lines.map((l) => [l.line, l.color]));
+            const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+            const { min: now } = madridNow();
+            const hhmm = (m: number) => `${String(Math.floor((((m % 1440) + 1440) % 1440) / 60)).padStart(2, '0')}:${String((((m % 1440) + 1440) % 1440) % 60).padStart(2, '0')}`;
+            const when = (d: { min: number; delay?: number }) => {
+              const left = d.min + (d.delay ?? 0) - now;
+              return left <= 0 ? 'ahora' : left < 60 ? `${left} min` : hhmm(d.min + (d.delay ?? 0));
+            };
+            const late = (d: { delay?: number }) => (d.delay === undefined ? '' : d.delay > 0 ? `<i class="cer-late">+${d.delay}′</i>` : '<i class="cer-ok">en hora</i>');
+            box.innerHTML = deps.length
+              ? `<ul class="metro-list cer-list">${deps.map((d) => `<li><span class="cer-chip" style="background:${esc(color.get(d.line) ?? '#64748b')}">${esc(d.line)}</span><span>${esc(d.to)}<small>${hhmm(d.min)} ${late(d)}</small></span><b>${when(d)}</b></li>`).join('')}</ul>`
+              : 'Sin trenes previstos en las próximas 3 horas.';
+          });
           return;
         }
         if (props.kind === 'metro-station' && typeof props.url === 'string' && props.url) {

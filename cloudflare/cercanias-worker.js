@@ -66,7 +66,9 @@ export function buildPayload(vehicles, trips, alerts, now = Date.now()) {
     seen.add(text);
     notices.push({ lines, text });
   }
-  return { updated: Number(vehicles?.header?.timestamp) * 1000 || now, trains, cancelled, notices };
+  // retraso (min) de todos los viajes de València con dato, para corregir los horarios de cada estación
+  const delayMin = Object.fromEntries([...delays].map(([id, d]) => [id, Math.round(d / 60)]));
+  return { updated: Number(vehicles?.header?.timestamp) * 1000 || now, trains, cancelled, notices, delays: delayMin };
 }
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET', 'Content-Type': 'application/json; charset=utf-8' };

@@ -4,6 +4,9 @@ name: Desplegar en GitHub Pages
 on:
   push:
   workflow_dispatch:
+  # cada madrugada, para renovar el horario de Cercanías de los próximos días
+  schedule:
+    - cron: '41 2 * * *'
 
 permissions:
   contents: read
@@ -25,6 +28,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Cercanías (líneas, estaciones y horarios desde el GTFS de Renfe)
+        # si Renfe no responde, se publica con las líneas guardadas en el repositorio y sin horarios
+        run: npm i --no-save tsx@4 && npx tsx scripts/build-cercanias.ts || echo "::warning::No se pudo generar el horario de Cercanías"
       - run: npm run build
         env:
           # opcional: clave de Google Maps Platform para la vista fotorrealista 3D

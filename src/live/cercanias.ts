@@ -6,14 +6,14 @@
  *    Mientras no haya intermediario configurado, la capa muestra solo líneas y estaciones.
  */
 import type { FeatureCollection } from 'geojson';
-import type { CercaniasData } from './cercaniasGtfs';
+import { nextDepartures, type CerTimetable, type CercaniasData, type Departure } from './cercaniasGtfs';
 
 /** Dirección del intermediario (no es secreta). Vacía = sin trenes en vivo. */
 export const CERCANIAS_LIVE_URL: string = (import.meta.env.VITE_CERCANIAS_URL as string | undefined) ?? '';
 
 export interface CerTrain { id: string; trip: string; line: string; lng: number; lat: number; status: string; stop: string; platform: string; delay: number | null; at: number }
 export interface CerNotice { lines: string[]; text: string }
-export interface CerLive { updated: number; trains: CerTrain[]; cancelled: number; notices: CerNotice[] }
+export interface CerLive { updated: number; trains: CerTrain[]; cancelled: number; notices: CerNotice[]; delays?: Record<string, number> }
 
 export interface CercaniasState {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -52,6 +52,13 @@ export function trainsGeo(live: CerLive, d?: CercaniasData): FeatureCollection {
   })));
 }
 
+/** Fecha (AAAA-MM-DD) y minuto del día en hora de Madrid. */
+export function madridNow(at = new Date()): { date: string; min: number } {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(at).map((p) => [p.type, p.value]));
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, min: Number(parts.hour) * 60 + Number(parts.minute) };
+}
+
 /** «C3, C5» → avisos que afectan a esas líneas */
 export const noticesFor = (notices: CerNotice[], lines: string[]) => notices.filter((n) => n.lines.some((l) => lines.includes(l)));
 
@@ -59,6 +66,7 @@ class Cercanias {
   private state: CercaniasState = { status: 'idle', geo: { lines: fc(), stations: fc(), trains: fc() } };
   private listeners = new Set<() => void>();
   private timer?: ReturnType<typeof setInterval>;
+  private timetable?: Promise<CerTimetable | undefined>;
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -97,6 +105,22 @@ class Cercanias {
     } catch (e) {
       this.set({ liveError: e instanceof Error ? e.message : String(e) });
     }
+  }
+
+  /** Próximas salidas de una estación (horario oficial, corregido con el retraso en vivo si lo hay). */
+  async departures(stop: string, n = 6): Promise<Departure[] | undefined> {
+    this.timetable ??= fetch(`${import.meta.env.BASE_URL}data/cercanias-horarios.json`)
+      .then((r) => (r.ok ? (r.json() as Promise<CerTimetable>) : undefined))
+      .catch(() => undefined);
+    const tt = await this.timetable;
+    if (!tt) {
+      this.timetable = undefined; // se reintentará en el siguiente clic
+      return undefined;
+    }
+    const { date, min } = madridNow();
+    const live = this.state.live;
+    const fresh = live && this.state.fetched && Date.now() - this.state.fetched < 3 * 60_000;
+    return nextDepartures(tt, stop, date, min, n, fresh && live.delays ? new Map(Object.entries(live.delays)) : undefined);
   }
 
   enable(on: boolean) {
