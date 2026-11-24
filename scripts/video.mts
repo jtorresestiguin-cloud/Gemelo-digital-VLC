@@ -235,15 +235,16 @@ async function main() {
   else await page.waitForFunction(() => (window as unknown as { __map?: unknown }).__map, null, { timeout: 60_000 });
   await page.keyboard.press('r'); // modo grabación: sin menús
   await page.addStyleTag({ content: CSS });
-  await page.evaluate(() => {
+  await page.evaluate((features) => {
     const w = window as unknown as { __map: { getLayer(id: string): unknown; setLayoutProperty(id: string, k: string, v: string): void } };
-    for (const id of ['vlc-monuments', 'vlc-monuments-label']) if (w.__map.getLayer(id)) w.__map.setLayoutProperty(id, 'visibility', 'none');
+    // en el vídeo de funcionalidades los monumentos los enciende y apaga cada escena con su interruptor
+    if (!features) for (const id of ['vlc-monuments', 'vlc-monuments-label']) if (w.__map.getLayer(id)) w.__map.setLayoutProperty(id, 'visibility', 'none');
     const layer = document.createElement('div');
     layer.className = 'vid-layer';
     layer.innerHTML = '<div class="vid-shade"></div><div class="vid-title"><div class="vid-kicker"></div><div class="vid-name"></div><div class="vid-sub"></div></div>'
       + '<div class="vid-card"><div class="vid-kicker"></div><div class="vid-name"></div><div class="vid-sub"></div><div class="vid-url"></div></div>';
     document.body.appendChild(layer);
-  });
+  }, FEATURES);
 
   // Precarga: el primer fotograma del trozo, con tiempo de sobra para llenar la caché
   let scene = -1;
