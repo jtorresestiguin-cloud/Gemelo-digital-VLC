@@ -37,7 +37,7 @@ if (process.env.ONLY === 'cercanias') {
   await page.locator('.live .switch', { hasText: 'Cercanías' }).click();
   await page.waitForTimeout(8000);
   console.log('Panel:', await page.locator('.live-row.on').innerText().catch(() => ''));
-  await page.evaluate(() => window.__map.jumpTo({ center: [-0.42, 39.45], zoom: 10.2, pitch: 0, bearing: 0 }));
+  await page.evaluate(() => { window.__map.jumpTo({ center: [-0.42, 39.45], zoom: 10.2, pitch: 0, bearing: 0 }); });
   await page.waitForTimeout(20_000);
   await page.keyboard.press('r');
   await page.waitForTimeout(1000);
