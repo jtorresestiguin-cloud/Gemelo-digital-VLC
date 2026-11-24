@@ -48,6 +48,63 @@ export const VIDEO_TOUR: Tour = {
   ],
 };
 
+/**
+ * VIDEO=features: vídeo corto de funcionalidades. Cada escena enciende sus capas (como si se
+ * tocaran los interruptores del menú) y muestra un rótulo breve. Sin enlaces en pantalla.
+ */
+const FEATURES = process.env.VIDEO === 'features';
+
+interface SceneState { monuments: boolean; services: string[]; live: string[]; fifteen: boolean }
+interface Scene { kicker: string; name: string; sub: string; state: SceneState }
+const OFF: SceneState = { monuments: false, services: [], live: [], fifteen: false };
+const LIVE_SWITCHES = ['Tráfico', 'Calidad del aire', 'Aparcamientos públicos', 'Ruido (Russafa)', 'Valenbisi'];
+
+export const FEATURES_TOUR: Tour = {
+  id: 'video-funcionalidades',
+  title: 'Gemelo Digital València',
+  stops: [
+    stop('València', '', [-0.3745, 39.4725], 13.4, 52, -20, 3.4),
+    stop('Visitas guiadas', '', [-0.3768, 39.4752], 16.3, 62, 200, 3.6),
+    stop('Servicios públicos', '', [-0.3725, 39.4665], 15.5, 58, 250, 3.6),
+    stop('Ciudad en vivo', '', [-0.3700, 39.4700], 14.3, 55, 300, 3.6),
+    stop('Medio ambiente', '', [-0.3735, 39.4620], 16.1, 60, 20, 3.6),
+    stop('Ciudad de los 15 minutos', '', [-0.3700, 39.4680], 13.2, 48, 40, 4.4),
+    stop('València', '', [-0.3600, 39.4685], 13.3, 52, 290, 4.2),
+  ],
+};
+
+const SCENES: Scene[] = [
+  { kicker: '', name: '', sub: '', state: OFF },
+  { kicker: 'Turismo', name: 'Visitas guiadas', sub: 'Rutas por la ciudad y ficha de cada monumento', state: { ...OFF, monuments: true } },
+  { kicker: 'Ciudadanía', name: 'Servicios públicos', sub: 'Salud, educación, cultura y deporte, con su ficha', state: { ...OFF, services: ['Sanidad', 'Educación', 'Cultura', 'Deporte'] } },
+  { kicker: 'Movilidad', name: 'Ciudad en vivo', sub: 'Tráfico, calidad del aire y aparcamientos en tiempo real', state: { ...OFF, live: ['Tráfico', 'Calidad del aire', 'Aparcamientos públicos'] } },
+  { kicker: 'Medio ambiente', name: 'Ruido, mar y aire', sub: 'Sensores de la ciudad, estado del mar, polen y UV', state: { ...OFF, live: ['Ruido (Russafa)', 'Calidad del aire'] } },
+  { kicker: 'Análisis', name: 'Ciudad de los 15 minutos', sub: 'Qué servicios tiene cada barrio a menos de 15 min a pie', state: { ...OFF, fifteen: true } },
+  { kicker: '', name: '', sub: '', state: OFF },
+];
+
+const TOUR = FEATURES ? FEATURES_TOUR : VIDEO_TOUR;
+
+/** Pone los interruptores del menú como pide la escena (clic por código: funciona con el menú oculto). */
+async function applyScene(page: Page, st: SceneState) {
+  await page.evaluate(({ st, liveAll }) => {
+    const set = (input: HTMLInputElement | null | undefined, on: boolean) => { if (input && input.checked !== on) input.click(); };
+    set(document.querySelector<HTMLInputElement>('.monuments-switch input'), st.monuments);
+    for (const label of document.querySelectorAll<HTMLElement>('.live .switch')) {
+      const name = liveAll.find((n) => label.textContent?.includes(n));
+      if (name) set(label.querySelector('input'), st.live.includes(name));
+    }
+    for (const label of document.querySelectorAll<HTMLElement>('.services .cat-list label')) {
+      const on = st.services.some((n) => label.textContent?.includes(n));
+      set(label.querySelector('input'), on);
+    }
+    set(document.querySelector<HTMLInputElement>('.fifteen .switch input'), st.fifteen);
+  }, { st, liveAll: LIVE_SWITCHES });
+  if (st.fifteen) await page.waitForFunction(() => document.querySelector('.f15-head'), null, { timeout: 180_000 }).catch(() => console.log('el análisis de 15 min no terminó'));
+  // tiempo para que lleguen los datos en vivo y se pinten
+  await page.waitForTimeout(st.live.length ? 8000 : 3000);
+}
+
 /** tsx (esbuild) añade __name() a las funciones que se envían a la página: lo definimos allí. */
 const NAME_SHIM = 'window.__name = window.__name || ((f) => f);';
 
@@ -95,6 +152,20 @@ async function settle(page: Page, net: ReturnType<typeof trackTiles>, maxMs: num
 
 function overlayFor(t: number, total: number, frame: ReturnType<typeof cameraAt>) {
   const fade = (a: number, b: number) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+  if (FEATURES) {
+    if (t < 3.4) {
+      const o = Math.min(fade(0.2, 1), 1 - fade(2.6, 3.4));
+      return { mode: 'card', opacity: o, kicker: 'Gemelo digital', name: 'València en 3D', sub: 'La ciudad fotorrealista, con datos abiertos', url: '' };
+    }
+    if (t > total - 4.2) {
+      const o = fade(total - 4.2, total - 3.2);
+      return { mode: 'card', opacity: o, kicker: 'Gemelo digital', name: 'Gemelo Digital València', sub: 'Servicios, movilidad y medio ambiente en un solo mapa', url: '' };
+    }
+    const sc = SCENES[frame.stopIndex];
+    const p = frame.holdProgress;
+    const o = sc.name && p > 0 && p < 1 ? Math.min(1, p / 0.15, (1 - p) / 0.15) : 0;
+    return { mode: 'title', opacity: o, kicker: sc.kicker, name: sc.name, sub: sc.sub, url: '' };
+  }
   if (t < 3.4) {
     const o = Math.min(fade(0.2, 1), 1 - fade(2.6, 3.4));
     return { mode: 'card', opacity: o, kicker: 'Gemelo digital', name: 'València en 3D', sub: 'Vuela por la ciudad fotorrealista', url: '' };
@@ -144,7 +215,7 @@ async function renderMusic(seconds: number, file: string) {
 
 async function main() {
   mkdirSync(FRAMES, { recursive: true });
-  const timeline = buildTimeline(VIDEO_TOUR);
+  const timeline = buildTimeline(TOUR);
   const total = LIMIT || timeline.duration;
   const nFrames = Math.round(total * FPS);
   const per = Math.ceil(nFrames / SHARDS);
@@ -175,7 +246,12 @@ async function main() {
   });
 
   // Precarga: el primer fotograma del trozo, con tiempo de sobra para llenar la caché
-  const first = cameraAt(VIDEO_TOUR, timeline, from / FPS).camera;
+  let scene = -1;
+  if (FEATURES) {
+    scene = cameraAt(TOUR, timeline, from / FPS).stopIndex;
+    await applyScene(page, SCENES[scene].state);
+  }
+  const first = cameraAt(TOUR, timeline, from / FPS).camera;
   await page.evaluate((c) => { (window as unknown as { __map: { jumpTo(o: unknown): void } }).__map.jumpTo(c); }, first);
   console.log('precarga', (await settle(page, net, 120_000, 1500)) ? 'ok' : 'incompleta');
 
@@ -183,7 +259,11 @@ async function main() {
   let incomplete = 0;
   for (let i = from; i < to; i++) {
     const t = i / FPS;
-    const frame = cameraAt(VIDEO_TOUR, timeline, t);
+    const frame = cameraAt(TOUR, timeline, t);
+    if (FEATURES && frame.stopIndex !== scene) {
+      scene = frame.stopIndex;
+      await applyScene(page, SCENES[scene].state);
+    }
     const ov = overlayFor(t, total, frame);
     await page.evaluate(({ cam, ov }) => {
       (window as unknown as { __map: { jumpTo(o: unknown): void } }).__map.jumpTo(cam);
@@ -215,7 +295,7 @@ async function main() {
 
 /** Une los fotogramas de todos los trozos, añade la música y escala al tamaño final. */
 async function assemble() {
-  const timeline = buildTimeline(VIDEO_TOUR);
+  const timeline = buildTimeline(TOUR);
   const total = LIMIT || timeline.duration;
   const nFrames = Math.round(total * FPS);
   // si falta algún fotograma (un trozo falló), se repite el anterior para no descuadrar el tiempo
@@ -229,11 +309,11 @@ async function assemble() {
   console.log(`[${FORMAT}] ${nFrames} fotogramas · rellenados ${missing}`);
   const cover = Math.min(nFrames - 1, Math.round((timeline.segments.find((s) => s.kind === 'hold' && s.index === 5)!.start + 2) * FPS));
   const scale = `scale=${SIZE.width}:${SIZE.height}:flags=lanczos`;
-  execFileSync('ffmpeg', ['-y', '-i', `${FRAMES}/f${String(cover).padStart(5, '0')}.jpg`, '-vf', scale, '-q:v', '2', `${OUT}/portada-${FORMAT}.jpg`], { stdio: 'inherit' });
+  execFileSync('ffmpeg', ['-y', '-i', `${FRAMES}/f${String(cover).padStart(5, '0')}.jpg`, '-vf', scale, '-q:v', '2', `${OUT}/portada-${FEATURES ? 'funciones-' : ''}${FORMAT}.jpg`], { stdio: 'inherit' });
 
   console.log('música…');
   await renderMusic(total, `${OUT}/musica.wav`);
-  const out = `${OUT}/gemelo-digital-valencia-${FORMAT}.mp4`;
+  const out = `${OUT}/gemelo-digital-valencia-${FEATURES ? 'funciones-' : ''}${FORMAT}.mp4`;
   execFileSync('ffmpeg', [
     '-y', '-framerate', String(FPS), '-i', `${FRAMES}/f%05d.jpg`, '-i', `${OUT}/musica.wav`,
     '-vf', scale, '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-maxrate', '8M', '-bufsize', '16M', '-pix_fmt', 'yuv420p', '-profile:v', 'high',

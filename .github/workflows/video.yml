@@ -17,6 +17,9 @@ on:
       formats:
         description: 'Formatos a grabar (JSON)'
         default: '["horizontal", "vertical"]'
+      video:
+        description: 'Guion: tour (paseo por la ciudad) o features (funcionalidades)'
+        default: 'tour'
 
 permissions:
   contents: write
@@ -49,6 +52,7 @@ jobs:
           SHARD: ${{ matrix.shard }}
           MAX_SECONDS: ${{ inputs.seconds }}
           FPS: ${{ inputs.fps }}
+          VIDEO: ${{ inputs.video }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -86,6 +90,7 @@ jobs:
           FORMAT: ${{ matrix.format }}
           MAX_SECONDS: ${{ inputs.seconds }}
           FPS: ${{ inputs.fps }}
+          VIDEO: ${{ inputs.video }}
       - uses: actions/upload-artifact@v4
         with:
           name: video-${{ matrix.format }}
