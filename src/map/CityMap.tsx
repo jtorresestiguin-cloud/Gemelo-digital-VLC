@@ -528,9 +528,11 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
           return;
         }
         if (props.kind === 'cer-station') {
-          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', focusAfterOpen: false })
-            .setLngLat(f.geometry.type === 'Point' ? (f.geometry.coordinates as LngLat) : e.lngLat)
-            .setHTML(popupHtml(props)).addTo(map!);
+          const at = f.geometry.type === 'Point' ? (f.geometry.coordinates as LngLat) : ([e.lngLat.lng, e.lngLat.lat] as LngLat);
+          popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', focusAfterOpen: false, anchor: 'bottom', offset: 8 })
+            .setLngLat(at).setHTML(popupHtml(props)).addTo(map!);
+          // la estación baja para que la ficha (con la lista de trenes) quepa entera por encima
+          map!.easeTo({ center: at, offset: [0, Math.round(map!.getContainer().clientHeight * 0.3)], duration: 500 });
           const shown = popup;
           void cercanias.departures(String(props.id)).then((deps) => {
             const box = shown.getElement()?.querySelector('.cer-next');
