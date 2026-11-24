@@ -76,7 +76,7 @@ export const FEATURES_TOUR: Tour = {
     stop('Visitas guiadas', '', [-0.37840, 39.47441], 16.9, 60, 10, 6),
     stop('Servicios públicos', '', [-0.3745, 39.4690], 15.6, 55, 250, 6),
     stop('Movilidad', '', [-0.37720, 39.46670], 15.9, 58, 170, 6),
-    stop('Medio ambiente', '', [-0.3740, 39.4640], 14.6, 52, 20, 6),
+    stop('Medio ambiente', '', [-0.3766, 39.4583], 15.2, 55, 20, 6),
     stop('Ciudad de los 15 minutos', '', [-0.3760, 39.4610], 14.6, 50, 60, 6.5),
     stop('València', '', [-0.3600, 39.4685], 13.3, 52, 290, 4.2),
   ],
@@ -92,11 +92,12 @@ const SCENES: Scene[] = [
     state: { ...OFF, live: ['Tráfico', 'Cercanías', 'Aparcamientos públicos'] }, card: { layer: 'vlc-cer-stations', name: 'Estació del Nord' },
     panel: { wrap: 'live', parts: ['.live > h4', '.live .live-row.on'] } },
   { kicker: 'Medio ambiente', name: 'Aire, ruido y mar', sub: 'Lo que miden los sensores de la ciudad, ahora mismo',
-    state: { ...OFF, live: ['Calidad del aire', 'Ruido (Russafa)'] }, card: { layer: 'vlc-air' },
+    state: { ...OFF, live: ['Calidad del aire', 'Ruido (Russafa)'] }, card: { layer: 'vlc-air', name: 'Silla' },
     panel: { wrap: 'live', parts: ['.live > h4', '.live .live-now', '.live .live-row.on'] } },
   { kicker: 'Análisis', name: 'Ciudad de los 15 minutos', sub: 'Toca cualquier punto: qué tienes a menos de 15 min a pie',
     state: { ...OFF, fifteen: true }, card: {},
-    panel: { wrap: 'live fifteen', parts: ['.fifteen .live-group', '.fifteen .f15-head', '.fifteen .f15-bars'] } },
+    // en vertical solo la cifra clave: la ficha «A pie desde aquí» necesita el espacio
+    panel: { wrap: 'live fifteen', parts: FORMAT === 'vertical' ? ['.fifteen .f15-head'] : ['.fifteen .f15-head', '.fifteen .f15-bars'] } },
   { kicker: '', name: '', sub: '', state: OFF },
 ];
 
@@ -122,6 +123,11 @@ async function applyScene(page: Page, st: SceneState) {
   if (st.fifteen) await page.waitForFunction(() => document.querySelector('.f15-head'), null, { timeout: 180_000 }).catch(() => console.log('el análisis de 15 min no terminó'));
   // tiempo para que lleguen los datos en vivo y se pinten
   await page.waitForTimeout(st.live.length ? 8000 : 3000);
+}
+
+/** Cierra las fichas abiertas como lo haría el usuario (así se borran también sus líneas). */
+async function closeCards(page: Page) {
+  await page.evaluate(() => document.querySelectorAll<HTMLElement>('.maplibregl-popup-close-button').forEach((b) => b.click()));
 }
 
 /** Copia del trozo del menú de la escena (o nada). */
@@ -152,18 +158,20 @@ async function openCard(page: Page, card: Card, cam: unknown): Promise<boolean> 
       queryRenderedFeatures(o: unknown): { properties: Record<string, unknown>; geometry: { type: string; coordinates: [number, number] } }[];
       fire(type: string, e: unknown): void; getLayer(id: string): unknown;
     } }).__map;
-    document.querySelectorAll('.maplibregl-popup').forEach((p) => p.remove());
+    document.querySelectorAll<HTMLElement>('.maplibregl-popup-close-button').forEach((b) => b.click());
     const c = m.project(m.getCenter());
     let pt: P = c;
     if (card.layer) {
       if (!m.getLayer(card.layer)) return false;
       const fs = m.queryRenderedFeatures({ layers: [card.layer] }).filter((f) => f.geometry.type === 'Point');
-      const named = card.name ? fs.filter((f) => String(f.properties.name ?? '').includes(card.name!)) : [];
+      const d = (f: (typeof fs)[number]) => { const q = m.project(f.geometry.coordinates); return Math.hypot(q.x - c.x, q.y - c.y); };
+      const near = Math.min(window.innerWidth, window.innerHeight) * 0.2;
+      const named = card.name ? fs.filter((f) => String(f.properties.name ?? '').includes(card.name!) && d(f) < near) : [];
       const pool = named.length ? named : fs;
       if (!pool.length) return false;
-      const d = (f: (typeof fs)[number]) => { const q = m.project(f.geometry.coordinates); return Math.hypot(q.x - c.x, q.y - c.y); };
       const f = pool.sort((a, b) => d(a) - d(b))[0];
       pt = m.project(f.geometry.coordinates);
+      console.log(`ficha: ${String(f.properties.name)} ${JSON.stringify(f.geometry.coordinates)} a ${Math.round(d(f))} px del centro`);
     }
     m.fire('click', { point: pt, lngLat: m.unproject([pt.x, pt.y]), originalEvent: {} });
     m.stop();
@@ -310,6 +318,7 @@ async function main() {
   await page.addInitScript({ content: NAME_SHIM });
   const net = trackTiles(page);
   page.on('pageerror', (e) => console.log('error en la página:', e.message));
+  page.on('console', (m) => { if (m.text().startsWith('ficha:')) console.log(m.text()); });
   await page.goto(`${SITE}?video=1`, { waitUntil: 'networkidle', timeout: 120_000 });
   // NO_PHOTOREAL=1 solo para probar el montaje en local, sin la ciudad de Google
   if (!process.env.NO_PHOTOREAL) await page.waitForFunction(() => (window as unknown as { __tileset?: unknown }).__tileset, null, { timeout: 180_000 });
@@ -353,6 +362,7 @@ async function main() {
       scene = frame.stopIndex;
       await applyScene(page, SCENES[scene].state);
       await setPanel(page, SCENES[scene].panel);
+      await closeCards(page);
       cardOpen = false;
     }
     const ov = overlayFor(t, total, frame);
@@ -366,7 +376,7 @@ async function main() {
         cardOpen = await openCard(page, sc.card!, frame.camera);
         if (!cardOpen) console.log('no se pudo abrir la ficha de', sc.name);
       } else if (!want && cardOpen) {
-        await page.evaluate(() => document.querySelectorAll('.maplibregl-popup').forEach((p) => p.remove()));
+        await closeCards(page);
         cardOpen = false;
       }
       await page.evaluate((o) => { const p = document.querySelector<HTMLElement>('.vid-panel'); if (p) p.style.opacity = String(o); }, ov.mode === 'title' ? ov.opacity : 0);
