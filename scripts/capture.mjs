@@ -14,6 +14,7 @@ page.on('response', (r) => {
   const u = r.url();
   if (u.includes('tile.googleapis.com')) (r.ok() ? stats.tiles++ : stats.tileErrors++);
   if (u.includes('api.cesium.com')) stats.ion = r.status();
+  if (r.status() === 404) stats.errors.push(`404 ${u.slice(0, 160)}`);
 });
 page.on('pageerror', (e) => stats.errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') stats.errors.push(m.text().slice(0, 200)); });
@@ -46,8 +47,7 @@ if (process.env.ONLY === 'cercanias') {
   for (const [file, name] of [['c2-ficha-nord.png', 'València-Estació del Nord'], ['c3-ficha-silla.png', 'Silla']]) {
     const at = await page.evaluate((n) => {
       const m = window.__map;
-      const src = m.getSource('vlc-cer-stations')._data;
-      const f = (src.features ?? []).find((x) => x.properties.name === n);
+      const f = m.querySourceFeatures('vlc-cer-stations').find((x) => x.properties.name === n);
       if (!f) return null;
       m.jumpTo({ center: f.geometry.coordinates, zoom: 15, pitch: 0, bearing: 0 });
       return f.geometry.coordinates;
