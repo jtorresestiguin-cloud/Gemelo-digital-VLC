@@ -1,7 +1,7 @@
 name: Vídeo para redes (fotos de control)
 
 # Dibuja solo un fotograma por escena del guion, en los dos formatos, para revisar el vídeo
-# en unos minutos antes de grabarlo entero. Las fotos quedan como artefacto «fotos-*».
+# en unos minutos antes de grabarlo entero. Las fotos se dejan en la rama «capturas».
 on:
   workflow_dispatch:
     inputs:
@@ -10,16 +10,12 @@ on:
         default: 'features'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   stills:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        format: [horizontal, vertical]
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,15 +26,25 @@ jobs:
       - run: npm i --no-save playwright@1.63.0 tsx@4
       - run: npx playwright install --with-deps chromium
       - run: sudo apt-get install -y -q fonts-inter || true
-      - run: npx tsx scripts/video.mts
+      - name: Fotos de control (horizontal y vertical a la vez)
         env:
-          FORMAT: ${{ matrix.format }}
           FPS: 25
           STILLS: 1
           VIDEO: ${{ inputs.video }}
-      - uses: actions/upload-artifact@v4
+        run: |
+          FORMAT=horizontal npx tsx scripts/video.mts > h.log 2>&1 &
+          FORMAT=vertical npx tsx scripts/video.mts > v.log 2>&1 &
+          wait
+          cat h.log v.log
+      - name: Publicar en la rama «capturas»
         if: always()
-        with:
-          name: fotos-${{ matrix.format }}
-          path: video/frames-${{ matrix.format }}/
-          retention-days: 3
+        run: |
+          mkdir -p capturas
+          for f in horizontal vertical; do for i in video/frames-$f/*.jpg; do [ -f "$i" ] && cp "$i" "capturas/$f-$(basename $i)"; done; done
+          cd capturas
+          git init -q -b capturas
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -q -m "Fotos de control del vídeo"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" capturas
