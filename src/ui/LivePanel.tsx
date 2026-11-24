@@ -2,9 +2,10 @@ import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { CityState, SourceStatus } from '../core/types';
 import { AIR_LEVELS, BIKE_COLORS, TRAFFIC_COLORS, TRAFFIC_LABELS } from '../map/layers';
 
+import { CERCANIAS_LIVE_URL, cercanias } from '../live/cercanias';
 import { extras, pollenLevel, uvLevel, type ExtraLayer, type ForecastHorizon } from '../live/extras';
 
-export type LiveLayer = 'traffic' | 'air' | 'bikes' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive';
+export type LiveLayer = 'traffic' | 'air' | 'bikes' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive' | 'cercanias';
 
 /** Interruptor del panel → fuente de datos adicional. */
 export const EXTRA_SOURCE: Partial<Record<LiveLayer, ExtraLayer>> = {
@@ -57,6 +58,19 @@ export function LivePanel({ state, sources, layers, onToggle }: Props) {
     if (x.errors[k] && !x.info[k]) return 'Sin conexión con la fuente; reintentando…';
     return x.info[k] ? `${x.info[k]} · ${ago(x.updated[k])}` : 'Cargando…';
   };
+  const cer = useSyncExternalStore(cercanias.subscribe, cercanias.get);
+  const cerStatus = (() => {
+    if (!layers.cercanias) return '';
+    if (cer.status === 'error') return 'No se pudieron cargar las líneas.';
+    if (!cer.data) return 'Cargando…';
+    const base = `${cer.data.lines.length} líneas · ${cer.data.stations.length} estaciones`;
+    if (!CERCANIAS_LIVE_URL) return base;
+    if (cer.live) {
+      const late = cer.live.trains.filter((t) => (t.delay ?? 0) >= 5).length;
+      return `${cer.live.trains.length} trenes circulando${late ? ` · ${late} con retraso` : ''} · ${ago(cer.fetched)}`;
+    }
+    return cer.liveError ? `${base} · trenes en vivo no disponibles ahora` : `${base} · buscando trenes…`;
+  })();
   const topPollen = x.sky?.pollen[0];
   const w = state.weather;
   const weatherLive = src('weather')?.mode === 'live';
@@ -128,6 +142,19 @@ export function LivePanel({ state, sources, layers, onToggle }: Props) {
       ))}
       {row('metroLive', 'Ⓜ️', 'Metro: estaciones', extraStatus('metroLive'), (
         <div className="muted small">Toca una estación para ver sus próximos trenes.</div>
+      ))}
+      {row('cercanias', '🚆', 'Cercanías', cerStatus, (
+        <>
+          {cer.data && (
+            <div className="legend">
+              {cer.data.lines.map((l) => <span key={l.line} title={l.name}><i className="bar" style={{ background: l.color }} />{l.line}</span>)}
+            </div>
+          )}
+          {cer.live?.notices.slice(0, 3).map((n) => (
+            <div key={n.text} className="cer-notice small"><b>{n.lines.join(', ')}</b> {n.text.length > 140 ? `${n.text.slice(0, 137)}…` : n.text}</div>
+          ))}
+          <div className="muted small">{CERCANIAS_LIVE_URL ? 'Toca un tren para ver su retraso, o una estación para ver qué trenes llegan.' : 'Toca una estación para ver sus líneas y horarios.'}</div>
+        </>
       ))}
       {row('bikes', '🚲', 'Valenbisi', status('bikes', state.bikes.length, 'estaciones'), (
         <div className="legend">

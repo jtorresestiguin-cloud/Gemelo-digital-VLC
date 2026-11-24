@@ -522,3 +522,10 @@ svg .ring { stroke: var(--panel-solid); stroke-width: 2; }
 .f15-list li.ok em { color: #34d399; } .f15-list li.ko em { color: #f43f5e; }
 
 .f15-popup .maplibregl-popup-content { max-height: 60vh; overflow-y: auto; }
+
+/* Cercanías */
+.cer-chips { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0 6px; }
+.cer-chip { display: inline-block; min-width: 22px; padding: 1px 5px; border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; text-align: center; line-height: 16px; }
+.cer-notice { margin: 6px 0 0; padding: 5px 7px; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.1); border-radius: 4px; font-size: 12px; line-height: 1.35; }
+.cer-notice b { margin-right: 4px; }
+.cer-link { display: inline-block; margin-top: 6px; font-size: 12px; }

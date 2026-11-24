@@ -8,6 +8,7 @@ import { AnalysisPanel } from './ui/AnalysisPanel';
 import { BimPanel, type BimModel } from './ui/BimPanel';
 import { ServicesPanel } from './ui/ServicesPanel';
 import { EXTRA_SOURCE, LivePanel } from './ui/LivePanel';
+import { cercanias } from './live/cercanias';
 import { extras } from './live/extras';
 import { FifteenPanel } from './ui/FifteenPanel';
 import { fifteen } from './analysis/fifteenData';
@@ -81,7 +82,7 @@ const ALL_LAYERS: Record<LayerKey, boolean> = {
   emtBuses: false, emtBuses3d: false, emtLabels: false, emtTrails: false, emtRoutes: false, emtStops: false,
   services: false, districts: false, ortho: false, terrain: false, bim: !SIMPLE,
   buildings: !SIMPLE, traffic: false, bikes: false, air: false, noise: false, metro: false, port: false, incidents: false, alerts: false, landmarks: false, monuments: true,
-  parking: false, forecast: false, works: false, metroLive: false, beaches: false, noiseLive: false, fifteen: false,
+  parking: false, forecast: false, works: false, metroLive: false, beaches: false, noiseLive: false, cercanias: false, fifteen: false,
 };
 /** Al encender los autobuses se encienden también sus complementos (etiquetas, estelas, 3D). */
 const EMT_SET: LayerKey[] = ['emtBuses', 'emtBuses3d', 'emtLabels', 'emtTrails'];
@@ -430,12 +431,13 @@ export default function App() {
             <LivePanel
               state={snapshot.state}
               sources={snapshot.sources}
-              layers={{ traffic: layers.traffic, air: layers.air, bikes: layers.bikes, parking: layers.parking, forecast: layers.forecast, works: layers.works, metroLive: layers.metroLive, beaches: layers.beaches, noiseLive: layers.noiseLive }}
+              layers={{ traffic: layers.traffic, air: layers.air, bikes: layers.bikes, parking: layers.parking, forecast: layers.forecast, works: layers.works, metroLive: layers.metroLive, beaches: layers.beaches, noiseLive: layers.noiseLive, cercanias: layers.cercanias }}
               onToggle={(k) => {
                 const on = !layers[k];
                 setLayers((l) => ({ ...l, [k]: on }));
                 const extra = EXTRA_SOURCE[k];
-                if (extra) extras.enable(extra, on);
+                if (k === 'cercanias') cercanias.enable(on);
+                else if (extra) extras.enable(extra, on);
                 else if (on) runtime.enableLive(k as 'traffic' | 'air' | 'bikes');
               }}
             />

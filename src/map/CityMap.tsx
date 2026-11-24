@@ -17,6 +17,7 @@ import type { IfcGeometry } from '../bim/ifc';
 import type { BimPlacement } from '../bim/BimLayer';
 import { fichaHtml, loadFichas, matchFicha } from '../adapters/fichas';
 import { extras, fetchDepartures } from '../live/extras';
+import { cercanias, noticesFor } from '../live/cercanias';
 import { fifteen } from '../analysis/fifteenData';
 import { ESSENTIALS, LIMIT_MIN, walkMinutes } from '../analysis/fifteen';
 import { VISIT_CHECKED, monumentById, monumentsGeo, type Monument } from '../tour/monuments';
@@ -24,7 +25,7 @@ import {
   AIR_LEVELS, BIKE_COLORS, TRAFFIC_COLORS, airGeo, alertsGeo, districtsGeo, servicesGeo, bikesGeo, incidentsGeo, landmarksGeo, metroGeo, noiseGeo, portGeo, trafficGeo,
 } from './layers';
 
-export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive' | 'fifteen';
+export type LayerKey = 'emtBuses' | 'emtBuses3d' | 'emtLabels' | 'emtTrails' | 'emtRoutes' | 'emtStops' | 'services' | 'districts' | 'ortho' | 'terrain' | 'bim' | 'buildings' | 'traffic' | 'bikes' | 'air' | 'noise' | 'metro' | 'port' | 'incidents' | 'alerts' | 'landmarks' | 'monuments' | 'parking' | 'forecast' | 'works' | 'metroLive' | 'beaches' | 'noiseLive' | 'cercanias' | 'fifteen';
 
 /** Cartografía base: OpenFreeMap (OpenStreetMap, vectorial, sin clave). Incluye alturas de edificios. */
 const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -78,6 +79,7 @@ const LAYER_GROUPS: Record<LayerKey, string[]> = {
   forecast: ['vlc-x-forecast'],
   works: ['vlc-x-works'],
   metroLive: ['vlc-x-metro', 'vlc-x-metro-label'],
+  cercanias: ['vlc-cer-lines', 'vlc-cer-stations', 'vlc-cer-trains', 'vlc-cer-stations-label', 'vlc-cer-trains-label'],
   beaches: ['vlc-x-beaches'],
   noiseLive: ['vlc-x-noise', 'vlc-x-noise-label'],
 };
@@ -250,6 +252,20 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
       'circle-color': '#ffffff', 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 7],
       'circle-stroke-color': '#e11d48', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 3.5],
     } });
+  // Cercanías: trazado con el color oficial de cada línea, estaciones y trenes en vivo
+  for (const id of ['lines', 'stations', 'trains']) map.addSource(`vlc-cer-${id}`, { type: 'geojson', data: empty });
+  map.addLayer({ id: 'vlc-cer-lines', type: 'line', source: 'vlc-cer-lines', layout: { ...hidden, 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.5, 13, 3, 17, 5], 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'vlc-cer-stations', type: 'circle', source: 'vlc-cer-stations', layout: hidden,
+    paint: {
+      'circle-color': '#ffffff', 'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2.5, 13, 4, 16, 7],
+      'circle-stroke-color': '#1e293b', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 1, 16, 2.5],
+    } });
+  map.addLayer({ id: 'vlc-cer-trains', type: 'circle', source: 'vlc-cer-trains', layout: hidden,
+    paint: {
+      'circle-color': ['get', 'color'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 5, 14, 8, 17, 11],
+      'circle-stroke-color': ['case', ['>=', ['get', 'delay'], 5], '#f43f5e', '#ffffff'], 'circle-stroke-width': 2.5,
+    } });
   // Monumentos de las visitas guiadas: punto discreto y nombre solo de cerca
   map.addSource('vlc-monuments', { type: 'geojson', data: monumentsGeo() });
   map.addLayer({ id: 'vlc-monuments', type: 'circle', source: 'vlc-monuments', minzoom: 12.5,
@@ -266,6 +282,11 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
       layout: { ...label, 'text-field': ['case', ['get', 'live'], ['concat', ['to-string', ['get', 'free']], ' libres'], ''] }, paint: halo });
     map.addLayer({ id: 'vlc-x-metro-label', type: 'symbol', source: 'vlc-x-metro', minzoom: 14.5,
       layout: { ...label, 'text-field': ['get', 'name'] }, paint: halo });
+    map.addLayer({ id: 'vlc-cer-stations-label', type: 'symbol', source: 'vlc-cer-stations', minzoom: 12.5,
+      layout: { ...label, 'text-field': ['get', 'name'], 'text-max-width': 9, 'text-optional': true }, paint: halo });
+    map.addLayer({ id: 'vlc-cer-trains-label', type: 'symbol', source: 'vlc-cer-trains',
+      layout: { visibility: 'none', 'text-field': ['get', 'tag'], 'text-size': 10, 'text-offset': [0, -1.5], 'text-anchor': 'bottom', 'text-allow-overlap': true, 'text-font': ['Noto Sans Bold'] },
+      paint: halo });
     map.addLayer({ id: 'vlc-x-noise-label', type: 'symbol', source: 'vlc-x-noise', minzoom: 15,
       layout: { ...label, 'text-field': ['concat', ['to-string', ['round', ['get', 'den']]], ' dB'] }, paint: halo });
     map.addLayer({ id: 'vlc-air-label', type: 'symbol', source: 'vlc-air', minzoom: 13, filter: ['>=', ['get', 'no2'], 0],
@@ -325,6 +346,29 @@ function popupHtml(p: Record<string, unknown>): string {
       return `${title}<table>${rows([[`Calidad del agua ${p.year}`, p.label], ...(p.history ? [['Años anteriores', p.history] as [string, unknown]] : [])])}</table><p class="src">Clasificación oficial · Agencia Europea de Medio Ambiente</p>`;
     case 'noise-live':
       return `${title}<table>${rows([['Día (7–19 h)', `${fmt(p.day)} dB`], ['Tarde (19–23 h)', `${fmt(p.evening)} dB`], ['Noche (23–7 h)', `${fmt(p.night)} dB`], ['Fecha', p.date]])}</table><p class="src">Sonómetros de Russafa · plataforma VLCi</p>`;
+    case 'cer-station': {
+      const c = cercanias.get();
+      const lines = String(p.lines).split(', ');
+      const color = new Map(c.data?.lines.map((l) => [l.line, l.color]));
+      const chips = lines.map((l) => `<span class="cer-chip" style="background:${esc(color.get(l) ?? '#64748b')}">${esc(l)}</span>`).join('');
+      const coming = (c.live?.trains ?? []).filter((t) => t.stop === p.id);
+      const notes = noticesFor(c.live?.notices ?? [], lines);
+      const st = (s: string) => (s === 'STOPPED_AT' ? 'en la estación' : s === 'INCOMING_AT' ? 'llegando' : 'en camino');
+      return `${title}<div class="cer-chips">${chips}</div>`
+        + (coming.length ? `<ul class="metro-list">${coming.map((t) => `<li><span class="cer-chip" style="background:${esc(color.get(t.line) ?? '#64748b')}">${esc(t.line)}</span><span>Tren ${esc(t.id)} · ${st(t.status)}</span><b>${t.delay ? `+${t.delay} min` : t.delay === 0 ? 'puntual' : ''}</b></li>`).join('')}</ul>` : '')
+        + notes.map((n) => `<div class="cer-notice">⚠ ${esc(n.text)}</div>`).join('')
+        + `<a class="cer-link" href="https://www.renfe.com/es/es/cercanias/cercanias-valencia/horarios" target="_blank" rel="noopener">Horarios en Renfe ↗</a>`
+        + `<p class="src">Fuente: Renfe (datos abiertos, CC BY 4.0)</p>`;
+    }
+    case 'cer-train': {
+      const where = p.stop ? (p.status === 'STOPPED_AT' ? ['Parado en', p.stop] : p.status === 'INCOMING_AT' ? ['Llegando a', p.stop] : ['Próxima estación', p.stop]) : undefined;
+      const delay = Number(p.delay);
+      return `${title}<table>${rows([
+        ...(where ? [where as [string, unknown]] : []),
+        ['Retraso', delay < 0 ? 'sin dato' : delay === 0 ? 'Puntual' : `${delay} min`],
+        ...(p.platform ? [['Vía', p.platform] as [string, unknown]] : []),
+      ])}</table><p class="src">Posición en tiempo real · Renfe (CC BY 4.0)</p>`;
+    }
     case 'metro-station':
       return `${title}<div class="f-hint">Línea${String(p.lines).includes(',') ? 's' : ''} ${esc(p.lines)}</div><div class="metro-next">Consultando próximos trenes…</div><p class="src">Fuente: Metrovalencia · Geoportal de València</p>`;
     case 'service': {
@@ -428,7 +472,7 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
         setReady(true);
         onMapReady?.(map!);
       });
-      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target', 'vlc-monuments', 'vlc-monuments-label', 'vlc-x-parking', 'vlc-x-metro', 'vlc-x-beaches', 'vlc-x-noise', 'vlc-x-works', 'vlc-x-forecast'];
+      const clickable = ['vlc-emt-buses', 'vlc-emt-bodies', 'vlc-emt-labels', 'vlc-emt-stops', 'vlc-services', 'vlc-districts-fill', 'vlc-traffic', 'vlc-bikes', 'vlc-air', 'vlc-noise', 'vlc-metro', 'vlc-port', 'vlc-incidents', 'vlc-alerts', 'vlc-landmarks', 'vlc-route-target', 'vlc-monuments', 'vlc-monuments-label', 'vlc-x-parking', 'vlc-x-metro', 'vlc-x-beaches', 'vlc-x-noise', 'vlc-x-works', 'vlc-x-forecast', 'vlc-cer-trains', 'vlc-cer-stations'];
       // Un único manejador: ficha solo del elemento más alto bajo el puntero (los distritos quedan debajo)
       let popup: maplibregl.Popup | undefined;
       map.on('click', (e) => {
@@ -567,6 +611,14 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
     if (!ready || !map) return;
     for (const [id, data] of Object.entries(extra.geo)) if (data) (map.getSource(`vlc-x-${id}`) as GeoJSONSource | undefined)?.setData(data);
   }, [extra.geo, ready]);
+
+  // Cercanías → fuentes
+  const cer = useSyncExternalStore(cercanias.subscribe, cercanias.get);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    for (const [id, data] of Object.entries(cer.geo)) (map.getSource(`vlc-cer-${id}`) as GeoJSONSource | undefined)?.setData(data);
+  }, [cer.geo, ready]);
 
   // Datos → fuentes GeoJSON
   useEffect(() => {

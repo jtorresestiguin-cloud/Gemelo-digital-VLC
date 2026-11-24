@@ -1,0 +1,38 @@
+name: Datos de Cercanías
+
+# Regenera public/data/cercanias-vlc.json (líneas y estaciones de Cercanías València) desde el GTFS
+# oficial de Renfe. Una vez al mes, o a mano; si algo cambia, lo sube a la rama y vuelve a publicar la web.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 3 * *'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm i --no-save tsx@4
+      - run: npx tsx scripts/build-cercanias.ts
+      - name: Subir si ha cambiado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- public/data/cercanias-vlc.json && git ls-files --error-unmatch public/data/cercanias-vlc.json >/dev/null 2>&1; then
+            echo "Sin cambios"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/cercanias-vlc.json
+          git commit -m "Cercanías: datos actualizados desde el GTFS de Renfe"
+          git push
+          gh workflow run deploy.yml --ref "${GITHUB_REF_NAME}"
