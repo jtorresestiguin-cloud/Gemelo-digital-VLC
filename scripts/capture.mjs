@@ -62,7 +62,7 @@ if (process.env.ONLY === 'cercanias') {
     await shot(file);
     console.log(`Ficha ${name}:`, await page.locator('.maplibregl-popup').innerText().catch(() => ''));
   }
-  console.log('Errores:', stats.errors.slice(0, 10));
+  console.log('Errores:', stats.errors.slice(0, 10), 'ion', stats.ion, 'teselas', stats.tiles, 'fallidas', stats.tileErrors);
   await browser.close();
   process.exit(0);
 }
