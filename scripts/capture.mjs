@@ -45,6 +45,8 @@ if (process.env.ONLY === 'cercanias') {
   await shot('c1-cercanias-area.png');
   await page.keyboard.press('r');
   for (const [file, name] of [['c2-ficha-nord.png', 'València-Estació del Nord'], ['c3-ficha-silla.png', 'Silla']]) {
+    await page.evaluate(() => { window.__map.jumpTo({ center: [-0.42, 39.3], zoom: 8.5 }); });
+    await page.waitForTimeout(3000);
     const at = await page.evaluate((n) => {
       const m = window.__map;
       const f = m.querySourceFeatures('vlc-cer-stations').find((x) => x.properties.name === n);

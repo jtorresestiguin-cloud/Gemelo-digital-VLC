@@ -276,7 +276,7 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12.5, 1, 16, 2],
     } });
   if (map.getStyle().glyphs) {
-    const label = { 'text-size': 11, 'text-offset': [0, 1.2] as [number, number], 'text-anchor': 'top' as const, visibility: 'none' as const };
+    const label = { 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 1.2] as [number, number], 'text-anchor': 'top' as const, visibility: 'none' as const };
     const halo = { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 };
     map.addLayer({ id: 'vlc-x-parking-label', type: 'symbol', source: 'vlc-x-parking', minzoom: 13.5,
       layout: { ...label, 'text-field': ['case', ['get', 'live'], ['concat', ['to-string', ['get', 'free']], ' libres'], ''] }, paint: halo });
@@ -290,10 +290,10 @@ function addOverlays(map: MlMap, perf: PerfSettings, hasOsm: boolean, theme: Map
     map.addLayer({ id: 'vlc-x-noise-label', type: 'symbol', source: 'vlc-x-noise', minzoom: 15,
       layout: { ...label, 'text-field': ['concat', ['to-string', ['round', ['get', 'den']]], ' dB'] }, paint: halo });
     map.addLayer({ id: 'vlc-air-label', type: 'symbol', source: 'vlc-air', minzoom: 13, filter: ['>=', ['get', 'no2'], 0],
-      layout: { 'text-field': ['concat', 'NO₂ ', ['to-string', ['get', 'no2']]], 'text-size': 11, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-allow-overlap': false },
+      layout: { 'text-font': ['Noto Sans Regular'], 'text-field': ['concat', 'NO₂ ', ['to-string', ['get', 'no2']]], 'text-size': 11, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-allow-overlap': false },
       paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 } });
     map.addLayer({ id: 'vlc-monuments-label', type: 'symbol', source: 'vlc-monuments', minzoom: 15.6,
-      layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.1], 'text-anchor': 'top', 'text-max-width': 9, 'text-optional': true },
+      layout: { 'text-font': ['Noto Sans Regular'], 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.1], 'text-anchor': 'top', 'text-max-width': 9, 'text-optional': true },
       paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(15,23,42,0.85)', 'text-halo-width': 1.4 } });
   }
   map.addLayer({ id: 'vlc-alert-pulse', type: 'circle', source: 'vlc-alerts', filter: ['==', ['get', 'kind'], 'alert'],
@@ -475,7 +475,8 @@ export function CityMap({ snapshot, layers, perf, focus, onBaseMap, onMapReady, 
       map.on('click', (e) => {
         const layers = clickable.filter((id) => map!.getLayer(id));
         const pad = 4;
-        const f = map!.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers })[0];
+        const hits = map!.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers });
+        const f = hits.find((h) => h.properties?.kind === 'cer-station' || h.properties?.kind === 'cer-train') ?? hits[0];
         popup?.remove();
         const props = (f?.properties ?? {}) as Record<string, unknown>;
         highlightLine(map!, props.kind === 'bus' ? String(props.line) : null);
